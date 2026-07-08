@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Chop Plan API - prepaid lunch subscription service for Lagos restaurants
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication for users and vendors
+  - name: vendors
+    description: Vendor browsing for users
+  - name: user
+    description: User profile and subscriptions
+  - name: vendor
+    description: Vendor dashboard and management
+  - name: blog
+    description: Blog posts
+  - name: contact
+    description: Contact form
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,538 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── AUTH ──────────────────────────────────────────────────────────────────
+  /auth/user/signup:
+    post:
+      operationId: userSignup
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSignupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/user/login:
+    post:
+      operationId: userLogin
+      tags: [auth]
+      summary: Login as a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/vendor/signup:
+    post:
+      operationId: vendorSignup
+      tags: [auth]
+      summary: Register a new vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorSignupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/vendor/login:
+    post:
+      operationId: vendorLogin
+      tags: [auth]
+      summary: Login as a vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user or vendor
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── VENDORS (public browsing) ─────────────────────────────────────────────
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List all vendors, optionally filtered by area/location
+      parameters:
+        - name: area
+          in: query
+          schema:
+            type: string
+          description: Lagos area/neighborhood filter (e.g. Lekki, VI, Ikeja)
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by vendor name or cuisine
+      responses:
+        "200":
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vendor"
+
+  /vendors/{vendorId}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      summary: Get a single vendor profile
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /vendors/{vendorId}/meals:
+    get:
+      operationId: listVendorMeals
+      tags: [vendors]
+      summary: Get meals offered by a vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of meals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Meal"
+
+  /vendors/{vendorId}/plans:
+    get:
+      operationId: listVendorPlans
+      tags: [vendors]
+      summary: Get subscription plans for a vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subscription plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubscriptionPlan"
+
+  /vendors/areas:
+    get:
+      operationId: listAreas
+      tags: [vendors]
+      summary: List all Lagos areas that have vendors
+      responses:
+        "200":
+          description: Unique area list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  # ── USER dashboard ────────────────────────────────────────────────────────
+  /user/profile:
+    get:
+      operationId: getUserProfile
+      tags: [user]
+      summary: Get logged-in user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateUserProfile
+      tags: [user]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /user/subscriptions:
+    get:
+      operationId: listUserSubscriptions
+      tags: [user]
+      summary: Get the user's active subscriptions
+      responses:
+        "200":
+          description: Subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSubscription"
+    post:
+      operationId: createSubscription
+      tags: [user]
+      summary: Subscribe to a vendor plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSubscription"
+
+  /user/subscriptions/{subscriptionId}:
+    delete:
+      operationId: cancelSubscription
+      tags: [user]
+      summary: Cancel a subscription
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ── VENDOR dashboard ──────────────────────────────────────────────────────
+  /vendor/profile:
+    get:
+      operationId: getVendorProfile
+      tags: [vendor]
+      summary: Get logged-in vendor profile
+      responses:
+        "200":
+          description: Vendor profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorProfile"
+    patch:
+      operationId: updateVendorProfile
+      tags: [vendor]
+      summary: Update vendor profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorProfile"
+
+  /vendor/dashboard:
+    get:
+      operationId: getVendorDashboard
+      tags: [vendor]
+      summary: Get vendor dashboard summary (subscribers, earnings, meals)
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDashboard"
+
+  /vendor/customers:
+    get:
+      operationId: listVendorCustomers
+      tags: [vendor]
+      summary: List vendor's subscribed customers
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VendorCustomer"
+
+  /vendor/earnings:
+    get:
+      operationId: getVendorEarnings
+      tags: [vendor]
+      summary: Get projected weekly and monthly earnings breakdown
+      responses:
+        "200":
+          description: Earnings data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorEarnings"
+
+  /vendor/meals:
+    get:
+      operationId: listMyMeals
+      tags: [vendor]
+      summary: Get vendor's own meal listings
+      responses:
+        "200":
+          description: Meal list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Meal"
+    post:
+      operationId: createMeal
+      tags: [vendor]
+      summary: Add a new meal to the menu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MealInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meal"
+
+  /vendor/meals/{mealId}:
+    patch:
+      operationId: updateMeal
+      tags: [vendor]
+      summary: Update a meal
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MealUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meal"
+    delete:
+      operationId: deleteMeal
+      tags: [vendor]
+      summary: Delete a meal
+      parameters:
+        - name: mealId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ── BLOG ─────────────────────────────────────────────────────────────────
+  /blog/posts:
+    get:
+      operationId: listBlogPosts
+      tags: [blog]
+      summary: List published blog posts
+      responses:
+        "200":
+          description: Blog posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogPost"
+
+  /blog/posts/{postId}:
+    get:
+      operationId: getBlogPost
+      tags: [blog]
+      summary: Get a single blog post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Blog post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogPost"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── CONTACT ───────────────────────────────────────────────────────────────
+  /contact:
+    post:
+      operationId: submitContact
+      tags: [contact]
+      summary: Submit a contact or support message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "200":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +574,440 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    # ── Auth ──────────────────────────────────────────────────────────────
+    UserSignupInput:
+      type: object
+      required: [name, email, password, phone, area]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+
+        password:
+          type: string
+          minLength: 6
+        phone:
+          type: string
+        area:
+          type: string
+          description: Lagos area/neighborhood
+
+    VendorSignupInput:
+      type: object
+      required: [businessName, ownerName, email, password, phone, area, cuisineType]
+      properties:
+        businessName:
+          type: string
+        ownerName:
+          type: string
+        email:
+          type: string
+
+        password:
+          type: string
+          minLength: 6
+        phone:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        description:
+          type: string
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, role, id, name, email]
+      properties:
+        token:
+          type: string
+        role:
+          type: string
+          enum: [user, vendor]
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+
+    MeResponse:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, vendor]
+        area:
+          type: ["string", "null"]
+
+    # ── Vendors (public) ──────────────────────────────────────────────────
+    Vendor:
+      type: object
+      required: [id, businessName, area, cuisineType, coverImage, rating, subscriberCount, lowestPlanPrice]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        coverImage:
+          type: string
+        rating:
+          type: number
+        subscriberCount:
+          type: integer
+        lowestPlanPrice:
+          type: integer
+          description: Lowest monthly plan price in Naira
+        description:
+          type: ["string", "null"]
+
+    VendorDetail:
+      type: object
+      required: [id, businessName, area, cuisineType, coverImage, rating, subscriberCount, description, plans, meals]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        coverImage:
+          type: string
+        rating:
+          type: number
+        subscriberCount:
+          type: integer
+        description:
+          type: string
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionPlan"
+        meals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meal"
+
+    SubscriptionPlan:
+      type: object
+      required: [id, name, daysPerMonth, freeDays, priceNaira, includesDelivery]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        priceNaira:
+          type: integer
+        includesDelivery:
+          type: boolean
+
+    Meal:
+      type: object
+      required: [id, name, description, priceNaira, imageUrl, available]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        priceNaira:
+          type: integer
+        imageUrl:
+          type: string
+        available:
+          type: boolean
+        category:
+          type: ["string", "null"]
+
+    # ── User ─────────────────────────────────────────────────────────────
+    UserProfile:
+      type: object
+      required: [id, name, email, phone, area]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+
+    UserSubscription:
+      type: object
+      required: [id, vendorId, vendorName, planName, daysPerMonth, freeDays, priceNaira, startDate, status]
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        vendorCoverImage:
+          type: ["string", "null"]
+        planName:
+          type: string
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        priceNaira:
+          type: integer
+        startDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, paused, cancelled]
+
+    SubscriptionInput:
+      type: object
+      required: [vendorId, planId]
+      properties:
+        vendorId:
+          type: integer
+        planId:
+          type: integer
+
+    # ── Vendor dashboard ──────────────────────────────────────────────────
+    VendorProfile:
+      type: object
+      required: [id, businessName, ownerName, email, phone, area, cuisineType]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        ownerName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        description:
+          type: ["string", "null"]
+        coverImage:
+          type: ["string", "null"]
+
+    VendorProfileUpdate:
+      type: object
+      properties:
+        businessName:
+          type: string
+        ownerName:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        description:
+          type: string
+
+    VendorDashboard:
+      type: object
+      required: [totalSubscribers, activeSubscribers, projectedWeeklyEarning, projectedMonthlyEarning, totalMeals, planBreakdown]
+      properties:
+        totalSubscribers:
+          type: integer
+        activeSubscribers:
+          type: integer
+        projectedWeeklyEarning:
+          type: integer
+        projectedMonthlyEarning:
+          type: integer
+        totalMeals:
+          type: integer
+        planBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanBreakdown"
+
+    PlanBreakdown:
+      type: object
+      required: [planName, subscriberCount, revenueNaira]
+      properties:
+        planName:
+          type: string
+        subscriberCount:
+          type: integer
+        revenueNaira:
+          type: integer
+
+    VendorCustomer:
+      type: object
+      required: [id, name, planName, startDate, status, priceNaira]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        planName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, paused, cancelled]
+        priceNaira:
+          type: integer
+
+    VendorEarnings:
+      type: object
+      required: [weekly, monthly, weeklyByPlan, monthlyByPlan]
+      properties:
+        weekly:
+          type: integer
+        monthly:
+          type: integer
+        weeklyByPlan:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanBreakdown"
+        monthlyByPlan:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanBreakdown"
+
+    MealInput:
+      type: object
+      required: [name, description, priceNaira, imageUrl]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        priceNaira:
+          type: integer
+        imageUrl:
+          type: string
+        category:
+          type: string
+        available:
+          type: boolean
+
+    MealUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        priceNaira:
+          type: integer
+        imageUrl:
+          type: string
+        category:
+          type: string
+        available:
+          type: boolean
+
+    # ── Blog ─────────────────────────────────────────────────────────────
+    BlogPost:
+      type: object
+      required: [id, title, slug, excerpt, content, author, publishedAt, coverImage]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: string
+        content:
+          type: string
+        author:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        coverImage:
+          type: string
+        category:
+          type: ["string", "null"]
+
+    # ── Contact ───────────────────────────────────────────────────────────
+    ContactInput:
+      type: object
+      required: [name, email, subject, message]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+
+        subject:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [general, support, partnership]

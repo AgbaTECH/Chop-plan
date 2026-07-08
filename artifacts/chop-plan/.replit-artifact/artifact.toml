@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/chop-plan/"
+title = "Chop Plan App"
+version = "1.0.0"
+id = "artifacts/chop-plan"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/chop-plan/" ]
+localPort = 23875
+
+[services.development]
+run = "pnpm --filter @workspace/chop-plan run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chop-plan", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/chop-plan/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23875"
+BASE_PATH = "/chop-plan/"
