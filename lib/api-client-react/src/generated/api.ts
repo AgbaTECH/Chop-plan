@@ -22,6 +22,7 @@ import type {
 import type {
   AdminCustomer,
   AdminCustomerInput,
+  AdminLead,
   AdminStats,
   AdminVendor,
   AdminVendorInput,
@@ -30,6 +31,7 @@ import type {
   ContactInput,
   ErrorResponse,
   HealthStatus,
+  LeadInput,
   ListVendorsParams,
   LoginInput,
   MeResponse,
@@ -2911,6 +2913,83 @@ export const useCreateAdminCustomer = <TError = ErrorType<ErrorResponse>,
       return useMutation(getCreateAdminCustomerMutationOptions(options));
     }
 
+export const getListAdminLeadsUrl = () => {
+
+
+
+
+  return `/api/admin/leads`
+}
+
+/**
+ * @summary List captured marketing leads
+ */
+export const listAdminLeads = async ( options?: RequestInit): Promise<AdminLead[]> => {
+
+  return customFetch<AdminLead[]>(getListAdminLeadsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminLeadsQueryKey = () => {
+    return [
+    `/api/admin/leads`
+    ] as const;
+    }
+
+
+export const getListAdminLeadsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminLeads>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminLeadsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminLeads>>> = ({ signal }) => listAdminLeads({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminLeads>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminLeadsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminLeads>>>
+export type ListAdminLeadsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List captured marketing leads
+ */
+
+export function useListAdminLeads<TData = Awaited<ReturnType<typeof listAdminLeads>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminLeads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminLeadsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getDeleteAdminCustomerUrl = (userId: number,) => {
 
 
@@ -3135,6 +3214,77 @@ export function useGetBlogPost<TData = Awaited<ReturnType<typeof getBlogPost>>, 
 
 
 
+
+export const getSubmitLeadUrl = () => {
+
+
+
+
+  return `/api/leads`
+}
+
+/**
+ * @summary Submit a prospective customer lead (e.g. from the marketing flyer)
+ */
+export const submitLead = async (leadInput: LeadInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getSubmitLeadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(leadInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitLeadMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitLead>>, TError,{data: BodyType<LeadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitLead>>, TError,{data: BodyType<LeadInput>}, TContext> => {
+
+const mutationKey = ['submitLead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitLead>>, {data: BodyType<LeadInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitLead(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitLeadMutationResult = NonNullable<Awaited<ReturnType<typeof submitLead>>>
+    export type SubmitLeadMutationBody = BodyType<LeadInput>
+    export type SubmitLeadMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Submit a prospective customer lead (e.g. from the marketing flyer)
+ */
+export const useSubmitLead = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitLead>>, TError,{data: BodyType<LeadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitLead>>,
+        TError,
+        {data: BodyType<LeadInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitLeadMutationOptions(options));
+    }
 
 export const getSubmitContactUrl = () => {
 

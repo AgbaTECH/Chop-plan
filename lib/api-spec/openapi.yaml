@@ -21,6 +21,8 @@ tags:
     description: Blog posts
   - name: contact
     description: Contact form
+  - name: leads
+    description: Marketing lead capture
   - name: admin
     description: Admin dashboard - manage vendors, customers and view analytics
 
@@ -770,6 +772,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/leads:
+    get:
+      operationId: listAdminLeads
+      tags: [admin]
+      summary: List captured marketing leads
+      responses:
+        "200":
+          description: Leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminLead"
+
   /admin/customers/{userId}:
     delete:
       operationId: deleteAdminCustomer
@@ -825,6 +842,32 @@ paths:
                 $ref: "#/components/schemas/BlogPost"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── LEADS ────────────────────────────────────────────────────────────────
+  /leads:
+    post:
+      operationId: submitLead
+      tags: [leads]
+      summary: Submit a prospective customer lead (e.g. from the marketing flyer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "200":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Validation error
           content:
             application/json:
               schema:
@@ -1422,6 +1465,34 @@ components:
           type: string
         category:
           type: ["string", "null"]
+
+    # ── Leads ─────────────────────────────────────────────────────────────
+    LeadInput:
+      type: object
+      required: [name, phone, email]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+
+    AdminLead:
+      type: object
+      required: [id, name, phone, email, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
     # ── Contact ───────────────────────────────────────────────────────────
     ContactInput:

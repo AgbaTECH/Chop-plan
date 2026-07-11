@@ -31,6 +31,7 @@ export default function Navbar() {
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" },
     { href: "/support", label: "Support" },
+    { href: "/get-started", label: "Get Started" },
   ];
 
   return (

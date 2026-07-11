@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Store, Users } from "lucide-react";
+import { LayoutDashboard, Store, Users, UserPlus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface AdminLayoutProps {
@@ -20,6 +20,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
     { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard },
     { href: "/admin/vendors", label: "Vendors", icon: Store },
     { href: "/admin/customers", label: "Customers", icon: Users },
+    { href: "/admin/leads", label: "Leads", icon: UserPlus },
   ];
 
   return (

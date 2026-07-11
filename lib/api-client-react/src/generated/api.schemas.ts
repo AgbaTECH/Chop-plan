@@ -349,6 +349,20 @@ export interface BlogPost {
   category?: string | null;
 }
 
+export interface LeadInput {
+  name: string;
+  phone: string;
+  email: string;
+}
+
+export interface AdminLead {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  createdAt: string;
+}
+
 export type ContactInputType = typeof ContactInputType[keyof typeof ContactInputType];
 
 

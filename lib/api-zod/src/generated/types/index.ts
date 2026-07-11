@@ -8,6 +8,7 @@
 
 export * from './adminCustomer';
 export * from './adminCustomerInput';
+export * from './adminLead';
 export * from './adminStats';
 export * from './adminVendor';
 export * from './adminVendorInput';
@@ -18,6 +19,7 @@ export * from './contactInput';
 export * from './contactInputType';
 export * from './errorResponse';
 export * from './healthStatus';
+export * from './leadInput';
 export * from './listVendorsParams';
 export * from './loginInput';
 export * from './meal';

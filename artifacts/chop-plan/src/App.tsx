@@ -27,6 +27,8 @@ import VendorWalletPage from './pages/VendorWalletPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminVendorsPage from './pages/AdminVendorsPage';
 import AdminCustomersPage from './pages/AdminCustomersPage';
+import AdminLeadsPage from './pages/AdminLeadsPage';
+import PromoFlyerPage from './pages/PromoFlyerPage';
 
 const queryClient = new QueryClient();
 
@@ -66,7 +68,10 @@ function Router() {
           <Route path="/admin/dashboard" component={AdminDashboardPage} />
           <Route path="/admin/vendors" component={AdminVendorsPage} />
           <Route path="/admin/customers" component={AdminCustomersPage} />
-          
+          <Route path="/admin/leads" component={AdminLeadsPage} />
+
+          <Route path="/get-started" component={PromoFlyerPage} />
+
           <Route component={NotFound} />
         </Switch>
       </main>

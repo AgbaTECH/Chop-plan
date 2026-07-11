@@ -5,8 +5,9 @@ import {
   usersTable,
   subscriptionsTable,
   subscriptionPlansTable,
+  leadsTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { hashPassword } from "../lib/sessions";
 import { CreateAdminVendorBody, CreateAdminCustomerBody } from "@workspace/api-zod";
@@ -167,6 +168,20 @@ router.delete("/admin/customers/:userId", requireAuth("admin"), async (req, res)
   const userId = Number(req.params.userId);
   await db.delete(usersTable).where(eq(usersTable.id, userId));
   res.json({ success: true, message: "Customer deleted" });
+});
+
+// GET /admin/leads
+router.get("/admin/leads", requireAuth("admin"), async (_req, res) => {
+  const leads = await db.select().from(leadsTable).orderBy(desc(leadsTable.createdAt));
+  res.json(
+    leads.map((l) => ({
+      id: l.id,
+      name: l.name,
+      phone: l.phone,
+      email: l.email,
+      createdAt: l.createdAt.toISOString(),
+    }))
+  );
 });
 
 export default router;

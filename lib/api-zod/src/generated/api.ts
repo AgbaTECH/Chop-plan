@@ -692,6 +692,19 @@ export const CreateAdminCustomerResponse = zod.object({
 
 
 /**
+ * @summary List captured marketing leads
+ */
+export const ListAdminLeadsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminLeadsResponse = zod.array(ListAdminLeadsResponseItem)
+
+
+/**
  * @summary Delete a customer
  */
 export const DeleteAdminCustomerParams = zod.object({
@@ -738,6 +751,21 @@ export const GetBlogPostResponse = zod.object({
   "publishedAt": zod.coerce.date(),
   "coverImage": zod.string(),
   "category": zod.string().nullish()
+})
+
+
+/**
+ * @summary Submit a prospective customer lead (e.g. from the marketing flyer)
+ */
+export const SubmitLeadBody = zod.object({
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string()
+})
+
+export const SubmitLeadResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
 })
 
 
