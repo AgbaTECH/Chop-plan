@@ -6,9 +6,12 @@ import {
   subscriptionsTable,
   subscriptionPlansTable,
   usersTable,
+  subscriptionDaysTable,
+  vendorWithdrawalsTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, asc, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
+import { perDayShareNaira } from "../lib/schedule";
 
 const router = Router();
 
@@ -216,6 +219,87 @@ router.delete("/vendor/meals/:mealId", requireAuth("vendor"), async (req: AuthRe
     .delete(mealsTable)
     .where(and(eq(mealsTable.id, mealId), eq(mealsTable.vendorId, req.session!.id)));
   res.json({ success: true, message: "Meal deleted" });
+});
+
+// GET /vendor/customers/:subscriptionId/schedule
+router.get("/vendor/customers/:subscriptionId/schedule", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const subscriptionId = Number(req.params.subscriptionId);
+  const [sub] = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(and(eq(subscriptionsTable.id, subscriptionId), eq(subscriptionsTable.vendorId, req.session!.id)));
+  if (!sub) {
+    res.status(404).json({ error: "Subscription not found" });
+    return;
+  }
+  const days = await db
+    .select()
+    .from(subscriptionDaysTable)
+    .where(eq(subscriptionDaysTable.subscriptionId, subscriptionId))
+    .orderBy(asc(subscriptionDaysTable.dayNumber));
+
+  res.json(days.map((d) => ({
+    id: d.id,
+    dayNumber: d.dayNumber,
+    scheduledDate: d.scheduledDate,
+    status: d.status as "pending" | "confirmed",
+    confirmedAt: d.confirmedAt,
+  })));
+});
+
+async function getVendorWalletSummary(vendorId: number) {
+  const confirmedDays = await db
+    .select({
+      priceNaira: subscriptionPlansTable.priceNaira,
+      daysPerMonth: subscriptionPlansTable.daysPerMonth,
+      freeDays: subscriptionPlansTable.freeDays,
+    })
+    .from(subscriptionDaysTable)
+    .innerJoin(subscriptionsTable, eq(subscriptionDaysTable.subscriptionId, subscriptionsTable.id))
+    .innerJoin(subscriptionPlansTable, eq(subscriptionsTable.planId, subscriptionPlansTable.id))
+    .where(and(eq(subscriptionsTable.vendorId, vendorId), eq(subscriptionDaysTable.status, "confirmed")));
+
+  const earnedNaira = confirmedDays.reduce(
+    (sum, d) => sum + perDayShareNaira(d.priceNaira, d.daysPerMonth, d.freeDays),
+    0
+  );
+
+  const withdrawals = await db
+    .select()
+    .from(vendorWithdrawalsTable)
+    .where(eq(vendorWithdrawalsTable.vendorId, vendorId))
+    .orderBy(desc(vendorWithdrawalsTable.createdAt));
+
+  const withdrawnNaira = withdrawals.reduce((sum, w) => sum + w.amountNaira, 0);
+
+  return {
+    earnedNaira,
+    withdrawableNaira: earnedNaira - withdrawnNaira,
+    withdrawnNaira,
+    withdrawals: withdrawals.map((w) => ({ id: w.id, amountNaira: w.amountNaira, createdAt: w.createdAt })),
+  };
+}
+
+// GET /vendor/wallet
+router.get("/vendor/wallet", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  res.json(await getVendorWalletSummary(req.session!.id));
+});
+
+// POST /vendor/wallet/withdraw
+router.post("/vendor/wallet/withdraw", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const amountNaira = Number(req.body?.amountNaira);
+  if (!amountNaira || amountNaira <= 0) {
+    res.status(400).json({ error: "Invalid withdrawal amount" });
+    return;
+  }
+  const summary = await getVendorWalletSummary(vendorId);
+  if (amountNaira > summary.withdrawableNaira) {
+    res.status(400).json({ error: "Amount exceeds withdrawable balance" });
+    return;
+  }
+  await db.insert(vendorWithdrawalsTable).values({ vendorId, amountNaira });
+  res.json(await getVendorWalletSummary(vendorId));
 });
 
 export default router;

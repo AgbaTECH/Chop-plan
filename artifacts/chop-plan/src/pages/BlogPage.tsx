@@ -10,7 +10,7 @@ export default function BlogPage() {
   return (
     <div className="container mx-auto px-4 py-20 max-w-6xl">
       <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">Blog</h1>
-      <p className="text-xl text-muted-foreground mb-12">Stories about food, business, and tech in Lagos.</p>
+      <p className="text-xl text-muted-foreground mb-12">Stories about food, business, and tech.</p>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

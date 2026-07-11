@@ -5,9 +5,11 @@ import {
   subscriptionsTable,
   vendorsTable,
   subscriptionPlansTable,
+  subscriptionDaysTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
+import { totalScheduleDays, buildScheduleRows } from "../lib/schedule";
 
 const router = Router();
 
@@ -82,6 +84,11 @@ router.post("/user/subscriptions", requireAuth("user"), async (req: AuthRequest,
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
   const [plan] = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.id, planId));
 
+  const scheduleRows = buildScheduleRows(sub.id, sub.startDate, totalScheduleDays(plan.daysPerMonth, plan.freeDays));
+  if (scheduleRows.length > 0) {
+    await db.insert(subscriptionDaysTable).values(scheduleRows);
+  }
+
   res.status(201).json({
     id: sub.id,
     vendorId: sub.vendorId,
@@ -104,6 +111,76 @@ router.delete("/user/subscriptions/:subscriptionId", requireAuth("user"), async 
     .set({ status: "cancelled" })
     .where(and(eq(subscriptionsTable.id, id), eq(subscriptionsTable.userId, req.session!.id)));
   res.json({ success: true, message: "Subscription cancelled" });
+});
+
+// GET /user/subscriptions/:subscriptionId/schedule
+router.get("/user/subscriptions/:subscriptionId/schedule", requireAuth("user"), async (req: AuthRequest, res) => {
+  const subscriptionId = Number(req.params.subscriptionId);
+  const [sub] = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(and(eq(subscriptionsTable.id, subscriptionId), eq(subscriptionsTable.userId, req.session!.id)));
+  if (!sub) {
+    res.status(404).json({ error: "Subscription not found" });
+    return;
+  }
+  const days = await db
+    .select()
+    .from(subscriptionDaysTable)
+    .where(eq(subscriptionDaysTable.subscriptionId, subscriptionId))
+    .orderBy(asc(subscriptionDaysTable.dayNumber));
+
+  res.json(days.map((d) => ({
+    id: d.id,
+    dayNumber: d.dayNumber,
+    scheduledDate: d.scheduledDate,
+    status: d.status as "pending" | "confirmed",
+    confirmedAt: d.confirmedAt,
+  })));
+});
+
+// POST /user/subscriptions/:subscriptionId/schedule/:dayId/confirm
+router.post("/user/subscriptions/:subscriptionId/schedule/:dayId/confirm", requireAuth("user"), async (req: AuthRequest, res) => {
+  const subscriptionId = Number(req.params.subscriptionId);
+  const dayId = Number(req.params.dayId);
+  const [sub] = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(and(eq(subscriptionsTable.id, subscriptionId), eq(subscriptionsTable.userId, req.session!.id)));
+  if (!sub) {
+    res.status(404).json({ error: "Subscription not found" });
+    return;
+  }
+  const [day] = await db
+    .select()
+    .from(subscriptionDaysTable)
+    .where(and(eq(subscriptionDaysTable.id, dayId), eq(subscriptionDaysTable.subscriptionId, subscriptionId)));
+  if (!day) {
+    res.status(404).json({ error: "Day not found" });
+    return;
+  }
+  if (day.status === "confirmed") {
+    res.status(400).json({ error: "This day is already confirmed" });
+    return;
+  }
+  const today = new Date().toISOString().split("T")[0];
+  if (day.scheduledDate > today) {
+    res.status(400).json({ error: "Cannot confirm a future pickup" });
+    return;
+  }
+  const [updated] = await db
+    .update(subscriptionDaysTable)
+    .set({ status: "confirmed", confirmedAt: new Date() })
+    .where(eq(subscriptionDaysTable.id, dayId))
+    .returning();
+
+  res.json({
+    id: updated.id,
+    dayNumber: updated.dayNumber,
+    scheduledDate: updated.scheduledDate,
+    status: updated.status as "pending" | "confirmed",
+    confirmedAt: updated.confirmedAt,
+  });
 });
 
 export default router;

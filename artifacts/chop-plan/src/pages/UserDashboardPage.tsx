@@ -5,7 +5,10 @@ import {
   useListUserSubscriptions, 
   useCancelSubscription, 
   useGetMe,
-  useUpdateUserProfile 
+  useUpdateUserProfile,
+  useGetUserSubscriptionSchedule,
+  useConfirmPickup,
+  getGetUserSubscriptionScheduleQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -16,7 +19,61 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, User, Clock, Utensils, AlertTriangle } from "lucide-react";
+import { Calendar, User, Clock, Utensils, AlertTriangle, CalendarCheck, Check } from "lucide-react";
+
+function SubscriptionScheduleDialog({ subscriptionId, open, onOpenChange }: { subscriptionId: number | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const { data: days, isLoading } = useGetUserSubscriptionSchedule(subscriptionId ?? 0, {
+    query: { enabled: !!subscriptionId && open, queryKey: getGetUserSubscriptionScheduleQueryKey(subscriptionId ?? 0) },
+  });
+  const confirmPickup = useConfirmPickup();
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const handleConfirm = (dayId: number) => {
+    if (!subscriptionId) return;
+    confirmPickup.mutate({ subscriptionId, dayId }, {
+      onSuccess: () => toast({ title: "Pickup confirmed" }),
+      onError: (err: any) => toast({ title: "Could not confirm", description: err?.data?.error, variant: "destructive" }),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-2xl">Pickup Schedule</DialogTitle>
+          <DialogDescription>Confirm each day once you've received your meal.</DialogDescription>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {days?.map((day) => {
+              const dateStr = new Date(day.scheduledDate).toISOString().split("T")[0];
+              const canConfirm = day.status === "pending" && dateStr <= todayStr;
+              return (
+                <div key={day.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <span className="text-sm font-mono">Day {day.dayNumber} &middot; {new Date(day.scheduledDate).toLocaleDateString()}</span>
+                  {day.status === "confirmed" ? (
+                    <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Confirmed</Badge>
+                  ) : canConfirm ? (
+                    <Button size="sm" variant="outline" className="font-mono" onClick={() => handleConfirm(day.id)} disabled={confirmPickup.isPending}>
+                      Confirm Received
+                    </Button>
+                  ) : (
+                    <Badge variant="secondary" className="font-mono uppercase text-[10px]">Upcoming</Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function UserDashboardPage() {
   const [, setLocation] = useLocation();
@@ -39,6 +96,8 @@ export default function UserDashboardPage() {
   const { data: subscriptions, isLoading: subsLoading } = useListUserSubscriptions();
   const updateProfile = useUpdateUserProfile();
   const cancelSub = useCancelSubscription();
+  const [scheduleSubId, setScheduleSubId] = useState<number | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -82,6 +141,7 @@ export default function UserDashboardPage() {
           {name?.charAt(0).toUpperCase() || "U"}
         </div>
         <div>
+          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">Customer Dashboard</p>
           <h1 className="text-3xl font-serif font-bold">Hello, {name}</h1>
           <p className="text-muted-foreground">Manage your meals and settings.</p>
         </div>
@@ -153,7 +213,18 @@ export default function UserDashboardPage() {
                           </div>
                         </div>
                         
-                        <div className="mt-6 flex justify-end">
+                        <div className="mt-6 flex justify-end gap-2">
+                          {isActive && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="font-mono gap-2"
+                              onClick={() => { setScheduleSubId(sub.id); setScheduleOpen(true); }}
+                              data-testid={`button-schedule-sub-${sub.id}`}
+                            >
+                              <CalendarCheck className="w-4 h-4" /> Pickup Schedule
+                            </Button>
+                          )}
                           {isActive && (
                             <Dialog>
                               <DialogTrigger asChild>
@@ -260,6 +331,7 @@ export default function UserDashboardPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      <SubscriptionScheduleDialog subscriptionId={scheduleSubId} open={scheduleOpen} onOpenChange={setScheduleOpen} />
     </div>
   );
 }

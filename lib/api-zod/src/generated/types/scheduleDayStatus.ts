@@ -6,11 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MeResponseRole = typeof MeResponseRole[keyof typeof MeResponseRole];
+export type ScheduleDayStatus = typeof ScheduleDayStatus[keyof typeof ScheduleDayStatus];
 
 
-export const MeResponseRole = {
-  user: 'user',
-  vendor: 'vendor',
-  admin: 'admin',
+export const ScheduleDayStatus = {
+  pending: 'pending',
+  confirmed: 'confirmed',
 } as const;

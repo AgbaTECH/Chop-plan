@@ -2,7 +2,7 @@ import { randomBytes, createHash } from "crypto";
 
 export interface Session {
   id: number;
-  role: "user" | "vendor";
+  role: "user" | "vendor" | "admin";
   name: string;
   email: string;
 }

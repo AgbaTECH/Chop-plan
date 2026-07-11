@@ -2,8 +2,10 @@ import { db } from "@workspace/db";
 import {
   usersTable, vendorsTable, subscriptionPlansTable,
   mealsTable, subscriptionsTable, blogPostsTable,
+  adminsTable, subscriptionDaysTable,
 } from "@workspace/db";
 import { createHash } from "crypto";
+import { totalScheduleDays, buildScheduleRows } from "./lib/schedule";
 
 function hashPassword(password: string): string {
   return createHash("sha256").update(password + "chop_plan_salt").digest("hex");
@@ -155,13 +157,40 @@ async function seed() {
   const v3Plans = plans.find((p) => p.vendorId === v3.id)!;
   const today = new Date().toISOString().split("T")[0];
 
-  await db.insert(subscriptionsTable).values([
+  const insertedSubs = await db.insert(subscriptionsTable).values([
     { userId: user1.id, vendorId: v1.id, planId: v1Plans.standard.id, startDate: today, status: "active" },
     { userId: user1.id, vendorId: v2.id, planId: v2Plans.starter.id, startDate: today, status: "active" },
     { userId: user2.id, vendorId: v1.id, planId: v1Plans.premium.id, startDate: today, status: "active" },
     { userId: user2.id, vendorId: v3.id, planId: v3Plans.standard.id, startDate: today, status: "active" },
     { userId: user3.id, vendorId: v2.id, planId: v2Plans.standard.id, startDate: today, status: "active" },
-  ]);
+  ]).returning();
+
+  // -- Pickup schedule rows for each seeded subscription --
+  const planById = new Map(
+    [v1Plans.standard, v1Plans.premium, v2Plans.starter, v2Plans.standard, v3Plans.standard].map((p) => [p.id, p])
+  );
+  const scheduleRows = insertedSubs.flatMap((sub) => {
+    const plan = planById.get(sub.planId)!;
+    const totalDays = totalScheduleDays(plan.daysPerMonth, plan.freeDays);
+    return buildScheduleRows(sub.id, sub.startDate, totalDays);
+  });
+  if (scheduleRows.length > 0) {
+    await db.insert(subscriptionDaysTable).values(scheduleRows);
+  }
+
+  // -- Admin account --
+  // Seeds a single admin using ADMIN_PASSWORD from the environment so a fresh
+  // setup always has usable admin credentials. Falls back to a dev-only
+  // default if the secret isn't set (e.g. first-time local seeding).
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+  await db.insert(adminsTable).values({
+    name: "Adebayo Olanrewaju",
+    email: "adebayoolanrewaju970@gmail.com",
+    passwordHash: hashPassword(adminPassword),
+  }).onConflictDoUpdate({
+    target: adminsTable.email,
+    set: { passwordHash: hashPassword(adminPassword) },
+  });
 
   // -- Blog Posts --
   await db.insert(blogPostsTable).values([
@@ -188,7 +217,7 @@ async function seed() {
     {
       title: "The Science of the Lagos Lunch Break: Why Your Midday Meal Matters",
       slug: "science-lagos-lunch-break",
-      excerpt: "Research shows that eating well at lunch improves afternoon productivity by up to 40%. Here's what Lagos professionals told us about their current lunch habits — and what they wish they could change.",
+      excerpt: "Research shows that eating well at lunch improves afternoon productivity by up to 40%. Here's what busy professionals told us about their current lunch habits — and what they wish they could change.",
       content: `Ask any Lagos professional about their lunch routine and you'll hear one of two stories: either they eat at their desk (a sad, guilty container of whatever was easiest) or they lose 40–60 minutes navigating the city to find something decent.\n\nNeither option is serving them well.\n\nA 2024 study by the Lagos Business School found that employees who eat a proper, satisfying midday meal report 38% higher afternoon productivity than those who skip or eat poorly. They also report lower stress levels and fewer late-afternoon energy crashes.\n\nThe barrier isn't desire — almost everyone we surveyed said they *want* to eat better at lunch. The barriers are time, cost uncertainty, and decision fatigue.\n\nThis is exactly the problem prepaid lunch subscriptions solve. When your lunch is already decided and already paid for, you eliminate two of the three friction points. The time savings are real too: Chop Plan subscribers with pickup options typically spend less than 8 minutes on their lunch transaction.\n\nThe remaining ingredient? Finding a vendor whose food you actually trust and enjoy. That's what our vendor discovery feature is built for — not just the nearest option, but the right option for you, with full meal menus, ratings, and transparent pricing before you commit a single naira.`,
       author: "Dr. Adaeze Nwosu",
       publishedAt: new Date("2025-07-08"),

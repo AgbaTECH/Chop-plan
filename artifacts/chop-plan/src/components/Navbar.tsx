@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, User, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useLogout } from "@workspace/api-client-react";
+import logo from "@/assets/logo.png";
 
 export default function Navbar() {
   const [location, setLocation] = useLocation();
@@ -36,6 +37,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container px-4 md:px-8 flex h-16 items-center justify-between max-w-7xl mx-auto">
         <Link href="/" className="flex items-center gap-2">
+          <img src={logo} alt="Chop Plan" className="h-9 w-9 object-contain" />
           <span className="font-serif text-2xl font-bold tracking-tight text-primary">Chop Plan</span>
         </Link>
 
@@ -56,7 +58,7 @@ export default function Navbar() {
           {isAuthenticated ? (
             <div className="flex items-center gap-4">
               <Link 
-                href={role === "vendor" ? "/vendor/dashboard" : "/dashboard"}
+                href={role === "vendor" ? "/vendor/dashboard" : role === "admin" ? "/admin/dashboard" : "/dashboard"}
                 className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2"
               >
                 <User className="h-4 w-4" />
@@ -105,7 +107,7 @@ export default function Navbar() {
                 {isAuthenticated ? (
                   <>
                     <Button asChild variant="outline" className="w-full justify-start text-lg h-12">
-                      <Link href={role === "vendor" ? "/vendor/dashboard" : "/dashboard"} onClick={() => setIsOpen(false)}>
+                      <Link href={role === "vendor" ? "/vendor/dashboard" : role === "admin" ? "/admin/dashboard" : "/dashboard"} onClick={() => setIsOpen(false)}>
                         <User className="h-5 w-5 mr-3" />
                         {name || "Dashboard"}
                       </Link>

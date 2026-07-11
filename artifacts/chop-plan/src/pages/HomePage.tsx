@@ -9,7 +9,7 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
         <div className="container px-4 md:px-8 max-w-6xl mx-auto relative z-10 text-center">
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold tracking-tight text-foreground max-w-4xl mx-auto leading-tight">
-            The prepaid lunch subscription for <span className="text-primary italic">Lagos</span> professionals.
+            The prepaid lunch subscription for <span className="text-primary italic">every</span> food lover.
           </h1>
           <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Discover the best local restaurants. Subscribe to a weekly meal plan. Never wonder what's for lunch again.

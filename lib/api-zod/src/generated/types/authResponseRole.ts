@@ -12,4 +12,5 @@ export type AuthResponseRole = typeof AuthResponseRole[keyof typeof AuthResponse
 export const AuthResponseRole = {
   user: 'user',
   vendor: 'vendor',
+  admin: 'admin',
 } as const;

@@ -21,6 +21,8 @@ tags:
     description: Blog posts
   - name: contact
     description: Contact form
+  - name: admin
+    description: Admin dashboard - manage vendors, customers and view analytics
 
 paths:
   /healthz:
@@ -149,6 +151,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/admin/login:
+    post:
+      operationId: adminLogin
+      tags: [auth]
+      summary: Login as an admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /auth/me:
     get:
@@ -360,6 +387,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /user/subscriptions/{subscriptionId}/schedule:
+    get:
+      operationId: getUserSubscriptionSchedule
+      tags: [user]
+      summary: Get the daily pickup schedule for a subscription
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Schedule days
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduleDay"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /user/subscriptions/{subscriptionId}/schedule/{dayId}/confirm:
+    post:
+      operationId: confirmPickup
+      tags: [user]
+      summary: Confirm a day's pickup was received
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: dayId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleDay"
+        "400":
+          description: Cannot confirm this day
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── VENDOR dashboard ──────────────────────────────────────────────────────
   /vendor/profile:
     get:
@@ -494,6 +584,199 @@ paths:
       summary: Delete a meal
       parameters:
         - name: mealId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /vendor/customers/{subscriptionId}/schedule:
+    get:
+      operationId: getVendorCustomerSchedule
+      tags: [vendor]
+      summary: Get the daily pickup schedule for one of the vendor's subscribers
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Schedule days
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduleDay"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /vendor/wallet:
+    get:
+      operationId: getVendorWallet
+      tags: [vendor]
+      summary: Get vendor wallet balance and withdrawal history
+      responses:
+        "200":
+          description: Wallet summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorWallet"
+
+  /vendor/wallet/withdraw:
+    post:
+      operationId: withdrawFromWallet
+      tags: [vendor]
+      summary: Withdraw available funds from the wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawInput"
+      responses:
+        "200":
+          description: Updated wallet summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorWallet"
+        "400":
+          description: Invalid withdrawal amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── ADMIN ────────────────────────────────────────────────────────────────
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get platform-wide analytics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/vendors:
+    get:
+      operationId: listAdminVendors
+      tags: [admin]
+      summary: List all vendors
+      responses:
+        "200":
+          description: Vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminVendor"
+    post:
+      operationId: createAdminVendor
+      tags: [admin]
+      summary: Add a new vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminVendorInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVendor"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/vendors/{vendorId}:
+    delete:
+      operationId: deleteAdminVendor
+      tags: [admin]
+      summary: Delete a vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/customers:
+    get:
+      operationId: listAdminCustomers
+      tags: [admin]
+      summary: List all customers
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminCustomer"
+    post:
+      operationId: createAdminCustomer
+      tags: [admin]
+      summary: Add a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCustomerInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCustomer"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/customers/{userId}:
+    delete:
+      operationId: deleteAdminCustomer
+      tags: [admin]
+      summary: Delete a customer
+      parameters:
+        - name: userId
           in: path
           required: true
           schema:
@@ -652,7 +935,7 @@ components:
           type: string
         role:
           type: string
-          enum: [user, vendor]
+          enum: [user, vendor, admin]
         id:
           type: integer
         name:
@@ -672,7 +955,7 @@ components:
           type: string
         role:
           type: string
-          enum: [user, vendor]
+          enum: [user, vendor, admin]
         area:
           type: ["string", "null"]
 
@@ -968,6 +1251,152 @@ components:
           type: string
         available:
           type: boolean
+
+    # ── Order tracking & wallet ─────────────────────────────────────────────
+    ScheduleDay:
+      type: object
+      required: [id, dayNumber, scheduledDate, status, confirmedAt]
+      properties:
+        id:
+          type: integer
+        dayNumber:
+          type: integer
+        scheduledDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [pending, confirmed]
+        confirmedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    WalletWithdrawal:
+      type: object
+      required: [id, amountNaira, createdAt]
+      properties:
+        id:
+          type: integer
+        amountNaira:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    VendorWallet:
+      type: object
+      required: [earnedNaira, withdrawableNaira, withdrawnNaira, withdrawals]
+      properties:
+        earnedNaira:
+          type: integer
+          description: Total earned to date from confirmed pickups
+        withdrawableNaira:
+          type: integer
+          description: Amount currently available to withdraw
+        withdrawnNaira:
+          type: integer
+        withdrawals:
+          type: array
+          items:
+            $ref: "#/components/schemas/WalletWithdrawal"
+
+    WithdrawInput:
+      type: object
+      required: [amountNaira]
+      properties:
+        amountNaira:
+          type: integer
+          minimum: 1
+
+    # ── Admin ────────────────────────────────────────────────────────────────
+    AdminStats:
+      type: object
+      required: [vendorCount, customerCount, activeSubscriptions, totalMonthlyRevenueNaira]
+      properties:
+        vendorCount:
+          type: integer
+        customerCount:
+          type: integer
+        activeSubscriptions:
+          type: integer
+        totalMonthlyRevenueNaira:
+          type: integer
+
+    AdminVendor:
+      type: object
+      required: [id, businessName, ownerName, email, phone, area, cuisineType, subscriberCount]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        ownerName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        subscriberCount:
+          type: integer
+
+    AdminVendorInput:
+      type: object
+      required: [businessName, ownerName, email, password, phone, area, cuisineType]
+      properties:
+        businessName:
+          type: string
+        ownerName:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        phone:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        description:
+          type: string
+
+    AdminCustomer:
+      type: object
+      required: [id, name, email, phone, area, activeSubscriptionCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        activeSubscriptionCount:
+          type: integer
+
+    AdminCustomerInput:
+      type: object
+      required: [name, email, password, phone, area]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        phone:
+          type: string
+        area:
+          type: string
 
     # ── Blog ─────────────────────────────────────────────────────────────
     BlogPost:

@@ -6,11 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MeResponseRole = typeof MeResponseRole[keyof typeof MeResponseRole];
-
-
-export const MeResponseRole = {
-  user: 'user',
-  vendor: 'vendor',
-  admin: 'admin',
-} as const;
+export interface WithdrawInput {
+  /** @minimum 1 */
+  amountNaira: number;
+}

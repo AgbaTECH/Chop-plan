@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-type Role = 'user' | 'vendor' | null;
+type Role = 'user' | 'vendor' | 'admin' | null;
 
 interface AuthContextType {
   token: string | null;

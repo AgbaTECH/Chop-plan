@@ -33,7 +33,7 @@ export const UserSignupBody = zod.object({
 
 export const UserSignupResponse = zod.object({
   "token": zod.string(),
-  "role": zod.enum(['user', 'vendor']),
+  "role": zod.enum(['user', 'vendor', 'admin']),
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string()
@@ -50,7 +50,7 @@ export const UserLoginBody = zod.object({
 
 export const UserLoginResponse = zod.object({
   "token": zod.string(),
-  "role": zod.enum(['user', 'vendor']),
+  "role": zod.enum(['user', 'vendor', 'admin']),
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string()
@@ -77,7 +77,7 @@ export const VendorSignupBody = zod.object({
 
 export const VendorSignupResponse = zod.object({
   "token": zod.string(),
-  "role": zod.enum(['user', 'vendor']),
+  "role": zod.enum(['user', 'vendor', 'admin']),
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string()
@@ -94,7 +94,7 @@ export const VendorLoginBody = zod.object({
 
 export const VendorLoginResponse = zod.object({
   "token": zod.string(),
-  "role": zod.enum(['user', 'vendor']),
+  "role": zod.enum(['user', 'vendor', 'admin']),
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string()
@@ -111,13 +111,30 @@ export const LogoutResponse = zod.object({
 
 
 /**
+ * @summary Login as an admin
+ */
+export const AdminLoginBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const AdminLoginResponse = zod.object({
+  "token": zod.string(),
+  "role": zod.enum(['user', 'vendor', 'admin']),
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
  * @summary Get current authenticated user or vendor
  */
 export const GetMeResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string(),
-  "role": zod.enum(['user', 'vendor']),
+  "role": zod.enum(['user', 'vendor', 'admin']),
   "area": zod.string().nullish()
 })
 
@@ -308,6 +325,40 @@ export const CancelSubscriptionResponse = zod.object({
 
 
 /**
+ * @summary Get the daily pickup schedule for a subscription
+ */
+export const GetUserSubscriptionScheduleParams = zod.object({
+  "subscriptionId": zod.coerce.number()
+})
+
+export const GetUserSubscriptionScheduleResponseItem = zod.object({
+  "id": zod.number(),
+  "dayNumber": zod.number(),
+  "scheduledDate": zod.coerce.date(),
+  "status": zod.enum(['pending', 'confirmed']),
+  "confirmedAt": zod.coerce.date().nullable()
+})
+export const GetUserSubscriptionScheduleResponse = zod.array(GetUserSubscriptionScheduleResponseItem)
+
+
+/**
+ * @summary Confirm a day's pickup was received
+ */
+export const ConfirmPickupParams = zod.object({
+  "subscriptionId": zod.coerce.number(),
+  "dayId": zod.coerce.number()
+})
+
+export const ConfirmPickupResponse = zod.object({
+  "id": zod.number(),
+  "dayNumber": zod.number(),
+  "scheduledDate": zod.coerce.date(),
+  "status": zod.enum(['pending', 'confirmed']),
+  "confirmedAt": zod.coerce.date().nullable()
+})
+
+
+/**
  * @summary Get logged-in vendor profile
  */
 export const GetVendorProfileResponse = zod.object({
@@ -472,6 +523,182 @@ export const DeleteMealParams = zod.object({
 })
 
 export const DeleteMealResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Get the daily pickup schedule for one of the vendor's subscribers
+ */
+export const GetVendorCustomerScheduleParams = zod.object({
+  "subscriptionId": zod.coerce.number()
+})
+
+export const GetVendorCustomerScheduleResponseItem = zod.object({
+  "id": zod.number(),
+  "dayNumber": zod.number(),
+  "scheduledDate": zod.coerce.date(),
+  "status": zod.enum(['pending', 'confirmed']),
+  "confirmedAt": zod.coerce.date().nullable()
+})
+export const GetVendorCustomerScheduleResponse = zod.array(GetVendorCustomerScheduleResponseItem)
+
+
+/**
+ * @summary Get vendor wallet balance and withdrawal history
+ */
+export const GetVendorWalletResponse = zod.object({
+  "earnedNaira": zod.number().describe('Total earned to date from confirmed pickups'),
+  "withdrawableNaira": zod.number().describe('Amount currently available to withdraw'),
+  "withdrawnNaira": zod.number(),
+  "withdrawals": zod.array(zod.object({
+  "id": zod.number(),
+  "amountNaira": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Withdraw available funds from the wallet
+ */
+
+
+
+export const WithdrawFromWalletBody = zod.object({
+  "amountNaira": zod.number().min(1)
+})
+
+export const WithdrawFromWalletResponse = zod.object({
+  "earnedNaira": zod.number().describe('Total earned to date from confirmed pickups'),
+  "withdrawableNaira": zod.number().describe('Amount currently available to withdraw'),
+  "withdrawnNaira": zod.number(),
+  "withdrawals": zod.array(zod.object({
+  "id": zod.number(),
+  "amountNaira": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Get platform-wide analytics
+ */
+export const GetAdminStatsResponse = zod.object({
+  "vendorCount": zod.number(),
+  "customerCount": zod.number(),
+  "activeSubscriptions": zod.number(),
+  "totalMonthlyRevenueNaira": zod.number()
+})
+
+
+/**
+ * @summary List all vendors
+ */
+export const ListAdminVendorsResponseItem = zod.object({
+  "id": zod.number(),
+  "businessName": zod.string(),
+  "ownerName": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "area": zod.string(),
+  "cuisineType": zod.string(),
+  "subscriberCount": zod.number()
+})
+export const ListAdminVendorsResponse = zod.array(ListAdminVendorsResponseItem)
+
+
+/**
+ * @summary Add a new vendor
+ */
+export const createAdminVendorBodyPasswordMin = 6;
+
+
+
+export const CreateAdminVendorBody = zod.object({
+  "businessName": zod.string(),
+  "ownerName": zod.string(),
+  "email": zod.string(),
+  "password": zod.string().min(createAdminVendorBodyPasswordMin),
+  "phone": zod.string(),
+  "area": zod.string(),
+  "cuisineType": zod.string(),
+  "description": zod.string().optional()
+})
+
+export const CreateAdminVendorResponse = zod.object({
+  "id": zod.number(),
+  "businessName": zod.string(),
+  "ownerName": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "area": zod.string(),
+  "cuisineType": zod.string(),
+  "subscriberCount": zod.number()
+})
+
+
+/**
+ * @summary Delete a vendor
+ */
+export const DeleteAdminVendorParams = zod.object({
+  "vendorId": zod.coerce.number()
+})
+
+export const DeleteAdminVendorResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary List all customers
+ */
+export const ListAdminCustomersResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "area": zod.string(),
+  "activeSubscriptionCount": zod.number()
+})
+export const ListAdminCustomersResponse = zod.array(ListAdminCustomersResponseItem)
+
+
+/**
+ * @summary Add a new customer
+ */
+export const createAdminCustomerBodyPasswordMin = 6;
+
+
+
+export const CreateAdminCustomerBody = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "password": zod.string().min(createAdminCustomerBodyPasswordMin),
+  "phone": zod.string(),
+  "area": zod.string()
+})
+
+export const CreateAdminCustomerResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "area": zod.string(),
+  "activeSubscriptionCount": zod.number()
+})
+
+
+/**
+ * @summary Delete a customer
+ */
+export const DeleteAdminCustomerParams = zod.object({
+  "userId": zod.coerce.number()
+})
+
+export const DeleteAdminCustomerResponse = zod.object({
   "success": zod.boolean(),
   "message": zod.string().optional()
 })

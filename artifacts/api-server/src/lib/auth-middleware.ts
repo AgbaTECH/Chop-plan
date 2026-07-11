@@ -5,7 +5,7 @@ export interface AuthRequest extends Request {
   session?: Session;
 }
 
-export function requireAuth(role?: "user" | "vendor") {
+export function requireAuth(role?: "user" | "vendor" | "admin") {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {

@@ -6,6 +6,7 @@ import userRouter from "./user";
 import vendorDashRouter from "./vendor-dash";
 import blogRouter from "./blog";
 import contactRouter from "./contact";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(userRouter);
 router.use(vendorDashRouter);
 router.use(blogRouter);
 router.use(contactRouter);
+router.use(adminRouter);
 
 export default router;

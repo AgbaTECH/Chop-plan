@@ -9,7 +9,9 @@ import {
   VendorSignupBody,
   UserLoginBody,
   VendorLoginBody,
+  AdminLoginBody,
 } from "@workspace/api-zod";
+import { adminsTable } from "@workspace/db";
 
 const router = Router();
 
@@ -98,6 +100,23 @@ router.post("/auth/vendor/login", async (req, res) => {
   }
   const token = createSession({ id: vendor.id, role: "vendor", name: vendor.businessName, email: vendor.email });
   res.json({ token, role: "vendor", id: vendor.id, name: vendor.businessName, email: vendor.email });
+});
+
+// POST /auth/admin/login
+router.post("/auth/admin/login", async (req, res) => {
+  const parsed = AdminLoginBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
+    return;
+  }
+  const { email, password } = parsed.data;
+  const [admin] = await db.select().from(adminsTable).where(eq(adminsTable.email, email)).limit(1);
+  if (!admin || !verifyPassword(password, admin.passwordHash)) {
+    res.status(401).json({ error: "Invalid email or password" });
+    return;
+  }
+  const token = createSession({ id: admin.id, role: "admin", name: admin.name, email: admin.email });
+  res.json({ token, role: "admin", id: admin.id, name: admin.name, email: admin.email });
 });
 
 // POST /auth/logout

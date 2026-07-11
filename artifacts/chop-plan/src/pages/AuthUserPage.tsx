@@ -80,7 +80,7 @@ export default function AuthUserPage() {
     <div className="container mx-auto px-4 py-20 flex justify-center items-center min-h-[calc(100vh-4rem)]">
       <Card className="w-full max-w-md shadow-lg border-border">
         <CardHeader className="text-center pb-2">
-          <CardTitle className="font-serif text-3xl">Diner Access</CardTitle>
+          <CardTitle className="font-serif text-3xl">Customer Access</CardTitle>
           <CardDescription>Find your next great lunch</CardDescription>
         </CardHeader>
         <CardContent>

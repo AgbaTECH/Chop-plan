@@ -5,3 +5,6 @@ export * from "./meals";
 export * from "./subscriptions";
 export * from "./blog";
 export * from "./contact";
+export * from "./admins";
+export * from "./schedule";
+export * from "./wallet";

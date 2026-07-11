@@ -51,6 +51,7 @@ export type AuthResponseRole = typeof AuthResponseRole[keyof typeof AuthResponse
 export const AuthResponseRole = {
   user: 'user',
   vendor: 'vendor',
+  admin: 'admin',
 } as const;
 
 export interface AuthResponse {
@@ -67,6 +68,7 @@ export type MeResponseRole = typeof MeResponseRole[keyof typeof MeResponseRole];
 export const MeResponseRole = {
   user: 'user',
   vendor: 'vendor',
+  admin: 'admin',
 } as const;
 
 export interface MeResponse {
@@ -247,6 +249,91 @@ export interface MealUpdate {
   imageUrl?: string;
   category?: string;
   available?: boolean;
+}
+
+export type ScheduleDayStatus = typeof ScheduleDayStatus[keyof typeof ScheduleDayStatus];
+
+
+export const ScheduleDayStatus = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+} as const;
+
+export interface ScheduleDay {
+  id: number;
+  dayNumber: number;
+  scheduledDate: string;
+  status: ScheduleDayStatus;
+  /** @nullable */
+  confirmedAt: string | null;
+}
+
+export interface WalletWithdrawal {
+  id: number;
+  amountNaira: number;
+  createdAt: string;
+}
+
+export interface VendorWallet {
+  /** Total earned to date from confirmed pickups */
+  earnedNaira: number;
+  /** Amount currently available to withdraw */
+  withdrawableNaira: number;
+  withdrawnNaira: number;
+  withdrawals: WalletWithdrawal[];
+}
+
+export interface WithdrawInput {
+  /** @minimum 1 */
+  amountNaira: number;
+}
+
+export interface AdminStats {
+  vendorCount: number;
+  customerCount: number;
+  activeSubscriptions: number;
+  totalMonthlyRevenueNaira: number;
+}
+
+export interface AdminVendor {
+  id: number;
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  area: string;
+  cuisineType: string;
+  subscriberCount: number;
+}
+
+export interface AdminVendorInput {
+  businessName: string;
+  ownerName: string;
+  email: string;
+  /** @minLength 6 */
+  password: string;
+  phone: string;
+  area: string;
+  cuisineType: string;
+  description?: string;
+}
+
+export interface AdminCustomer {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  area: string;
+  activeSubscriptionCount: number;
+}
+
+export interface AdminCustomerInput {
+  name: string;
+  email: string;
+  /** @minLength 6 */
+  password: string;
+  phone: string;
+  area: string;
 }
 
 export interface BlogPost {

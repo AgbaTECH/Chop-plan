@@ -6,11 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MeResponseRole = typeof MeResponseRole[keyof typeof MeResponseRole];
-
-
-export const MeResponseRole = {
-  user: 'user',
-  vendor: 'vendor',
-  admin: 'admin',
-} as const;
+export interface AdminStats {
+  vendorCount: number;
+  customerCount: number;
+  activeSubscriptions: number;
+  totalMonthlyRevenueNaira: number;
+}

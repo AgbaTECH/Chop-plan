@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { VendorLayout } from "@/components/VendorLayout";
-import { useListVendorCustomers } from "@workspace/api-client-react";
+import { useListVendorCustomers, useGetVendorCustomerSchedule, getGetVendorCustomerScheduleQueryKey } from "@workspace/api-client-react";
 import { 
   Table, 
   TableBody, 
@@ -11,10 +12,52 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { CalendarCheck } from "lucide-react";
+
+function CustomerScheduleDialog({ subscriptionId, open, onOpenChange }: { subscriptionId: number | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { data: days, isLoading } = useGetVendorCustomerSchedule(subscriptionId ?? 0, {
+    query: { enabled: !!subscriptionId && open, queryKey: getGetVendorCustomerScheduleQueryKey(subscriptionId ?? 0) },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-2xl">Pickup Schedule</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {days?.map((day) => (
+              <div key={day.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                <span className="text-sm font-mono">Day {day.dayNumber} &middot; {format(new Date(day.scheduledDate), 'MMM dd, yyyy')}</span>
+                <Badge variant={day.status === 'confirmed' ? 'default' : 'secondary'} className="font-mono uppercase text-[10px]">
+                  {day.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function VendorCustomersPage() {
   const { data: customers, isLoading } = useListVendorCustomers();
+  const [selectedSubId, setSelectedSubId] = useState<number | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const viewSchedule = (subscriptionId: number) => {
+    setSelectedSubId(subscriptionId);
+    setDialogOpen(true);
+  };
 
   return (
     <VendorLayout title="Customer Subscriptions">
@@ -29,6 +72,7 @@ export default function VendorCustomersPage() {
                   <TableHead>Active Plan</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Schedule</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -39,6 +83,7 @@ export default function VendorCustomersPage() {
                       <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     </TableRow>
                   ))
@@ -61,11 +106,16 @@ export default function VendorCustomersPage() {
                           {customer.status}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => viewSchedule(customer.id)} className="gap-2">
+                          <CalendarCheck className="w-4 h-4" /> View
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                       No customers found. Wait for users to subscribe to your plans.
                     </TableCell>
                   </TableRow>
@@ -75,6 +125,7 @@ export default function VendorCustomersPage() {
           </div>
         </CardContent>
       </Card>
+      <CustomerScheduleDialog subscriptionId={selectedSubId} open={dialogOpen} onOpenChange={setDialogOpen} />
     </VendorLayout>
   );
 }

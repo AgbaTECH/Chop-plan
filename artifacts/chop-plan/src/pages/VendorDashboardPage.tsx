@@ -76,7 +76,7 @@ export default function VendorDashboardPage() {
                 <div className="text-2xl font-bold font-mono text-foreground">
                   {dashboard.totalSubscribers}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Unique diners</p>
+                <p className="text-xs text-muted-foreground mt-1">Unique customers</p>
               </CardContent>
             </Card>
 

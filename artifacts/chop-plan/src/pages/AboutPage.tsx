@@ -8,17 +8,17 @@ export default function AboutPage() {
       <div className="prose prose-lg prose-green max-w-none">
         <p className="text-xl text-muted-foreground mb-12">
           We built Chop Plan because we were tired of the daily "what's for lunch?" debate. 
-          Lagos has some of the best food in the world, but accessing it predictably during a busy workday is a chore.
+          Great local food is everywhere, but accessing it predictably during a busy day is a chore.
         </p>
 
         <h2 className="font-serif text-3xl font-bold mt-12 mb-6">Our Mission</h2>
         <p>
-          We connect hungry professionals with excellent local restaurants through predictable, prepaid subscriptions. 
+          We connect hungry food lovers with excellent local restaurants through predictable, prepaid subscriptions. 
           By paying upfront, customers get guaranteed daily meals without the daily ordering friction, and restaurants 
           get the predictable revenue they need to thrive.
         </p>
 
-        <h2 className="font-serif text-3xl font-bold mt-12 mb-6">For Professionals</h2>
+        <h2 className="font-serif text-3xl font-bold mt-12 mb-6">For Food Lovers</h2>
         <p>
           Your time is valuable. Spending 30 minutes every day deciding what to eat, coordinating delivery, and 
           dealing with delayed riders adds up. With Chop Plan, you make that decision once a week. Your food arrives, 
