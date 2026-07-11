@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation } from "wouter";
-import { useGetVendor, useCreateSubscription } from "@workspace/api-client-react";
+import { useGetVendor, useCreateSubscription, getGetVendorQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export default function VendorDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: vendor, isLoading, error } = useGetVendor(id, {
-    query: { enabled: !isNaN(id) }
+    query: { enabled: !isNaN(id), queryKey: getGetVendorQueryKey(id) }
   });
 
   const createSubscription = useCreateSubscription();
@@ -44,7 +44,7 @@ export default function VendorDetailPage() {
     if (!selectedPlanId) return;
 
     setIsSubmitting(true);
-    createSubscription.mutate({ data: { planId: selectedPlanId } }, {
+    createSubscription.mutate({ data: { vendorId: id, planId: selectedPlanId } }, {
       onSuccess: () => {
         toast({
           title: "Subscription Confirmed!",
@@ -52,10 +52,10 @@ export default function VendorDetailPage() {
         });
         setLocation("/dashboard");
       },
-      onError: (err) => {
+      onError: (err: any) => {
         toast({
           title: "Subscription failed",
-          description: err.data?.message || "Please try again later.",
+          description: err?.data?.error || "Please try again later.",
           variant: "destructive"
         });
         setIsSubmitting(false);
@@ -91,7 +91,7 @@ export default function VendorDetailPage() {
       <div className="container mx-auto px-4 py-40 max-w-3xl text-center">
         <h1 className="text-4xl font-serif font-bold mb-4">Restaurant not found</h1>
         <p className="text-muted-foreground mb-8">This restaurant may have been removed or is temporarily unavailable.</p>
-        <Button asChild font-mono>
+        <Button asChild className="font-mono">
           <Link href="/vendors">Back to Restaurants</Link>
         </Button>
       </div>
@@ -189,23 +189,25 @@ export default function VendorDetailPage() {
               {vendor.plans && vendor.plans.length > 0 ? (
                 <div className="space-y-4">
                   {vendor.plans.map((plan) => (
-                    <Card key={plan.id} className={`border-2 transition-all ${plan.isActive ? 'hover:border-primary/50' : 'opacity-60'}`}>
+                    <Card key={plan.id} className="border-2 transition-all hover:border-primary/50">
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start mb-2">
                           <CardTitle className="font-serif text-xl">{plan.name}</CardTitle>
-                          <Badge variant={plan.durationDays === 30 ? "default" : "secondary"}>
-                            {plan.durationDays} Days
+                          <Badge variant={plan.includesDelivery ? "default" : "secondary"}>
+                            {plan.daysPerMonth} days/mo
                           </Badge>
                         </div>
                         <div className="font-mono text-2xl font-bold text-primary">
-                          ₦{plan.price.toLocaleString('en-NG')}
+                          ₦{plan.priceNaira.toLocaleString('en-NG')}
                         </div>
                       </CardHeader>
                       <CardContent className="pb-4">
-                        <p className="text-sm text-muted-foreground">{plan.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {plan.freeDays} free days included{plan.includesDelivery ? " · Delivery included" : ""}
+                        </p>
                       </CardContent>
                       <CardFooter>
-                        {plan.isActive ? (
+                        {true ? (
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
@@ -226,11 +228,11 @@ export default function VendorDetailPage() {
                               <div className="bg-muted p-4 rounded-lg my-4 space-y-3 font-mono text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Price</span>
-                                  <span className="font-bold">₦{plan.price.toLocaleString('en-NG')}</span>
+                                  <span className="font-bold">₦{plan.priceNaira.toLocaleString('en-NG')}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Duration</span>
-                                  <span>{plan.durationDays} Days</span>
+                                  <span className="text-muted-foreground">Days per month</span>
+                                  <span>{plan.daysPerMonth} ({plan.freeDays} free)</span>
                                 </div>
                               </div>
                               
@@ -260,9 +262,7 @@ export default function VendorDetailPage() {
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
-                        ) : (
-                          <Button disabled variant="outline" className="w-full font-mono">Unavailable</Button>
-                        )}
+                        ) : null}
                       </CardFooter>
                     </Card>
                   ))}

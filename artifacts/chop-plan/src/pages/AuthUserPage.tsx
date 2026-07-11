@@ -20,6 +20,8 @@ const loginSchema = z.object({
 
 const signupSchema = loginSchema.extend({
   name: z.string().min(2),
+  phone: z.string().min(7),
+  area: z.string().min(2),
 });
 
 export default function AuthUserPage() {
@@ -37,20 +39,20 @@ export default function AuthUserPage() {
 
   const signupForm = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { name: "", email: "", password: "", phone: "", area: "" },
   });
 
   function onLogin(data: z.infer<typeof loginSchema>) {
     loginMutation.mutate({ data }, {
       onSuccess: (res) => {
-        login(res.token, res.user.role as 'user', res.user.name);
+        login(res.token, 'user', res.name);
         toast({ title: "Welcome back!" });
         setLocation("/vendors");
       },
       onError: (err) => {
         toast({ 
           title: "Login failed", 
-          description: err.data?.message || "Invalid credentials",
+          description: err.data?.error || "Invalid credentials",
           variant: "destructive" 
         });
       }
@@ -60,14 +62,14 @@ export default function AuthUserPage() {
   function onSignup(data: z.infer<typeof signupSchema>) {
     signupMutation.mutate({ data }, {
       onSuccess: (res) => {
-        login(res.token, res.user.role as 'user', res.user.name);
+        login(res.token, 'user', res.name);
         toast({ title: "Account created successfully" });
         setLocation("/vendors");
       },
       onError: (err) => {
         toast({ 
           title: "Signup failed", 
-          description: err.data?.message || "Could not create account",
+          description: err.data?.error || "Could not create account",
           variant: "destructive" 
         });
       }
@@ -161,6 +163,32 @@ export default function AuthUserPage() {
                         <FormLabel>Password</FormLabel>
                         <FormControl>
                           <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="0801 234 5678" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="area"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Area (Lagos)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Lekki, Ikeja, Yaba" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

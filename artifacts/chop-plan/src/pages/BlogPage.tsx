@@ -32,12 +32,12 @@ export default function BlogPage() {
       ) : posts && posts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {posts.map((post) => (
-            <Link key={post.slug} href={`/blog/${post.slug}`}>
+            <Link key={post.id} href={`/blog/${post.id}`}>
               <Card className="h-full overflow-hidden border border-border hover-elevate transition-all cursor-pointer flex flex-col group">
-                {post.imageUrl && (
+                {post.coverImage && (
                   <div className="w-full h-48 overflow-hidden">
                     <img 
-                      src={post.imageUrl} 
+                      src={post.coverImage} 
                       alt={post.title} 
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

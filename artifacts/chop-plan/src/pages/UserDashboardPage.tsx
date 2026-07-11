@@ -41,9 +41,9 @@ export default function UserDashboardPage() {
   const cancelSub = useCancelSubscription();
 
   useEffect(() => {
-    if (profile?.user) {
-      setProfileName(profile.user.name);
-      setProfileEmail(profile.user.email);
+    if (profile) {
+      setProfileName(profile.name);
+      setProfileEmail(profile.email);
     }
   }, [profile]);
 
@@ -62,7 +62,7 @@ export default function UserDashboardPage() {
   };
 
   const handleCancelSubscription = (subId: number) => {
-    cancelSub.mutate(subId, {
+    cancelSub.mutate({ subscriptionId: subId }, {
       onSuccess: () => {
         toast({ title: "Subscription cancelled successfully" });
         // Let React Query handle cache invalidation automatically based on generated hook config
@@ -113,19 +113,16 @@ export default function UserDashboardPage() {
           ) : subscriptions && subscriptions.length > 0 ? (
             <div className="grid gap-6">
               {subscriptions.map(sub => {
-                const vendor = (sub as any).vendor; // Assuming API returns nested vendor object
-                const plan = (sub as any).plan;
                 const startDate = new Date(sub.startDate);
-                const endDate = new Date(sub.endDate);
                 const isActive = sub.status === "active";
                 const isCancelled = sub.status === "cancelled";
 
                 return (
                   <Card key={sub.id} className={`overflow-hidden border ${isActive ? 'border-primary/30 shadow-md' : 'border-border opacity-75'}`}>
                     <div className="flex flex-col md:flex-row">
-                      {vendor?.coverImage && (
+                      {sub.vendorCoverImage && (
                         <div className="w-full md:w-48 h-40 md:h-auto bg-muted">
-                          <img src={vendor.coverImage} alt={vendor.businessName} className="w-full h-full object-cover" />
+                          <img src={sub.vendorCoverImage} alt={sub.vendorName} className="w-full h-full object-cover" />
                         </div>
                       )}
                       <div className="p-6 flex-1 flex flex-col justify-between">
@@ -136,22 +133,22 @@ export default function UserDashboardPage() {
                                 {sub.status.toUpperCase()}
                               </Badge>
                               <h3 className="text-xl font-serif font-bold text-foreground">
-                                {plan?.name || "Meal Plan"} <span className="text-muted-foreground font-normal text-base">from</span> {vendor?.businessName || "Restaurant"}
+                                {sub.planName || "Meal Plan"} <span className="text-muted-foreground font-normal text-base">from</span> {sub.vendorName || "Restaurant"}
                               </h3>
                             </div>
                             <div className="text-right">
-                              <span className="font-mono font-bold text-lg text-primary">₦{(plan?.price || 0).toLocaleString('en-NG')}</span>
+                              <span className="font-mono font-bold text-lg text-primary">₦{sub.priceNaira.toLocaleString('en-NG')}</span>
                             </div>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4 mt-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
                               <Calendar className="w-4 h-4" />
-                              <span>Starts: {startDate.toLocaleDateString()}</span>
+                              <span>Started: {startDate.toLocaleDateString()}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Clock className="w-4 h-4" />
-                              <span>Ends: {endDate.toLocaleDateString()}</span>
+                              <span>{sub.daysPerMonth} days/mo ({sub.freeDays} free)</span>
                             </div>
                           </div>
                         </div>
@@ -170,7 +167,7 @@ export default function UserDashboardPage() {
                                     <AlertTriangle className="w-5 h-5" /> Cancel Subscription?
                                   </DialogTitle>
                                   <DialogDescription className="text-base pt-2">
-                                    Are you sure you want to cancel your <strong>{plan?.name}</strong> plan from <strong>{vendor?.businessName}</strong>? 
+                                    Are you sure you want to cancel your <strong>{sub.planName}</strong> plan from <strong>{sub.vendorName}</strong>? 
                                     This action cannot be undone and your meals will stop at the end of the current billing cycle.
                                   </DialogDescription>
                                 </DialogHeader>
@@ -192,7 +189,7 @@ export default function UserDashboardPage() {
                           )}
                           {isCancelled && (
                             <Button asChild variant="outline" size="sm" className="font-mono">
-                              <Link href={`/vendors/${vendor?.id}`}>Resubscribe</Link>
+                              <Link href={`/vendors/${sub.vendorId}`}>Resubscribe</Link>
                             </Button>
                           )}
                         </div>
@@ -253,7 +250,7 @@ export default function UserDashboardPage() {
             <CardFooter className="bg-muted/30 border-t px-6 py-4">
               <Button 
                 onClick={handleUpdateProfile} 
-                disabled={profileLoading || updateProfile.isPending || profileName === profile?.user?.name}
+                disabled={profileLoading || updateProfile.isPending || profileName === profile?.name}
                 className="font-mono ml-auto"
                 data-testid="button-save-profile"
               >

@@ -43,25 +43,25 @@ export default function VendorDashboardPage() {
             
             <Card className="border-border hover-elevate transition-transform bg-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Projected Monthly</CardTitle>
                 <TrendingUp className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold font-mono text-foreground">
-                  ₦{dashboard.totalRevenue.toLocaleString('en-NG')}
+                  ₦{dashboard.projectedMonthlyEarning.toLocaleString('en-NG')}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Lifetime earnings</p>
+                <p className="text-xs text-muted-foreground mt-1">Expected this month</p>
               </CardContent>
             </Card>
 
             <Card className="border-border hover-elevate transition-transform bg-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active Subscriptions</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active Subscribers</CardTitle>
                 <Activity className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold font-mono text-foreground">
-                  {dashboard.activeSubscriptions}
+                  {dashboard.activeSubscribers}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Currently feeding</p>
               </CardContent>
@@ -69,12 +69,12 @@ export default function VendorDashboardPage() {
 
             <Card className="border-border hover-elevate transition-transform bg-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Subscribers</CardTitle>
                 <Users className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold font-mono text-foreground">
-                  {dashboard.totalCustomers}
+                  {dashboard.totalSubscribers}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Unique diners</p>
               </CardContent>
@@ -82,18 +82,37 @@ export default function VendorDashboardPage() {
 
             <Card className="border-border hover-elevate transition-transform bg-card">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Monthly MRR</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Menu Items</CardTitle>
                 <CreditCard className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold font-mono text-foreground">
-                  ₦{dashboard.monthlyRecurringRevenue.toLocaleString('en-NG')}
+                  {dashboard.totalMeals}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Expected this month</p>
+                <p className="text-xs text-muted-foreground mt-1">Meals on your menu</p>
               </CardContent>
             </Card>
 
           </div>
+
+          {dashboard.planBreakdown && dashboard.planBreakdown.length > 0 && (
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle className="font-serif text-xl">Plan Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {dashboard.planBreakdown.map((p) => (
+                  <div key={p.planName} className="flex items-center justify-between border-b border-border last:border-0 pb-3 last:pb-0">
+                    <div>
+                      <p className="font-medium font-serif">{p.planName}</p>
+                      <p className="text-xs text-muted-foreground">{p.subscriberCount} subscribers</p>
+                    </div>
+                    <span className="font-mono font-bold text-primary">₦{p.revenueNaira.toLocaleString('en-NG')}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="mt-12 bg-card border rounded-xl p-8 text-center text-muted-foreground">
             <Activity className="w-12 h-12 mx-auto mb-4 text-primary/40" />

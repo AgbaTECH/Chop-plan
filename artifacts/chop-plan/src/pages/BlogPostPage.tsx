@@ -1,5 +1,5 @@
 import { Link, useParams } from "wouter";
-import { useGetBlogPost } from "@workspace/api-client-react";
+import { useGetBlogPost, getGetBlogPostQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 
 export default function BlogPostPage() {
   const params = useParams();
-  const slug = params.slug as string;
-  const { data: post, isLoading, error } = useGetBlogPost(slug, {
-    query: { enabled: !!slug }
+  const postId = Number(params.slug);
+  const { data: post, isLoading, error } = useGetBlogPost(postId, {
+    query: { enabled: !isNaN(postId), queryKey: getGetBlogPostQueryKey(postId) }
   });
 
   if (isLoading) {
@@ -62,9 +62,9 @@ export default function BlogPostPage() {
         <p className="text-xl text-muted-foreground">{post.excerpt}</p>
       </div>
 
-      {post.imageUrl && (
+      {post.coverImage && (
         <div className="mb-12 rounded-xl overflow-hidden bg-muted">
-          <img src={post.imageUrl} alt={post.title} className="w-full h-auto object-cover max-h-[500px]" />
+          <img src={post.coverImage} alt={post.title} className="w-full h-auto object-cover max-h-[500px]" />
         </div>
       )}
 

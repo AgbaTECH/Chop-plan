@@ -21,7 +21,7 @@ export default function VendorEarningsPage() {
         <div className="bg-popover border border-border p-3 shadow-md rounded-lg">
           <p className="font-serif font-bold text-popover-foreground mb-1">{label}</p>
           <p className="font-mono text-primary font-bold">
-            ₦{payload[0].value.toLocaleString('en-NG')}
+            ₦{Number(payload[0].value).toLocaleString('en-NG')}
           </p>
         </div>
       );
@@ -47,24 +47,24 @@ export default function VendorEarningsPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader className="pb-2">
-                <CardTitle className="text-muted-foreground text-sm font-medium">Total Balance</CardTitle>
+                <CardTitle className="text-muted-foreground text-sm font-medium">Projected Weekly</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold font-mono text-primary">
-                  ₦{earnings.balance.toLocaleString('en-NG')}
+                  ₦{earnings.weekly.toLocaleString('en-NG')}
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">Available for payout</p>
+                <p className="text-sm text-muted-foreground mt-2">Based on active subscriptions</p>
               </CardContent>
             </Card>
             <Card className="bg-card">
               <CardHeader className="pb-2">
-                <CardTitle className="text-muted-foreground text-sm font-medium">Pending Clearance</CardTitle>
+                <CardTitle className="text-muted-foreground text-sm font-medium">Projected Monthly</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold font-mono">
-                  ₦{earnings.pending.toLocaleString('en-NG')}
+                  ₦{earnings.monthly.toLocaleString('en-NG')}
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">Clears in 3-5 business days</p>
+                <p className="text-sm text-muted-foreground mt-2">Based on active subscriptions</p>
               </CardContent>
             </Card>
           </div>
@@ -72,26 +72,25 @@ export default function VendorEarningsPage() {
 
         <Card className="bg-card">
           <CardHeader>
-            <CardTitle className="font-serif text-xl">Revenue History</CardTitle>
+            <CardTitle className="font-serif text-xl">Monthly Revenue by Plan</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="w-full h-[350px]" />
-            ) : earnings?.history && earnings.history.length > 0 ? (
+            ) : earnings?.monthlyByPlan && earnings.monthlyByPlan.length > 0 ? (
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={earnings.history}
+                    data={earnings.monthlyByPlan}
                     margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
-                      dataKey="date" 
+                      dataKey="planName" 
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                       dy={10}
-                      tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     />
                     <YAxis 
                       axisLine={false}
@@ -101,7 +100,7 @@ export default function VendorEarningsPage() {
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
                     <Bar 
-                      dataKey="amount" 
+                      dataKey="revenueNaira" 
                       fill="hsl(var(--primary))" 
                       radius={[4, 4, 0, 0]} 
                       maxBarSize={50}

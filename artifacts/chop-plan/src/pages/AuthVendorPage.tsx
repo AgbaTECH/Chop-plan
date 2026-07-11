@@ -20,11 +20,12 @@ const loginSchema = z.object({
 });
 
 const signupSchema = loginSchema.extend({
-  name: z.string().min(2),
+  ownerName: z.string().min(2),
   businessName: z.string().min(2),
   description: z.string().min(10),
   area: z.string().min(2),
   cuisineType: z.string().min(2),
+  phone: z.string().min(7),
 });
 
 export default function AuthVendorPage() {
@@ -43,27 +44,28 @@ export default function AuthVendorPage() {
   const signupForm = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: { 
-      name: "", 
+      ownerName: "", 
       email: "", 
       password: "",
       businessName: "",
       description: "",
       area: "",
-      cuisineType: ""
+      cuisineType: "",
+      phone: "",
     },
   });
 
   function onLogin(data: z.infer<typeof loginSchema>) {
     loginMutation.mutate({ data }, {
       onSuccess: (res) => {
-        login(res.token, res.user.role as 'vendor', res.user.businessName || res.user.name);
+        login(res.token, 'vendor', res.name);
         toast({ title: "Welcome back to your dashboard" });
         setLocation("/vendor/dashboard");
       },
       onError: (err) => {
         toast({ 
           title: "Login failed", 
-          description: err.data?.message || "Invalid credentials",
+          description: err.data?.error || "Invalid credentials",
           variant: "destructive" 
         });
       }
@@ -73,14 +75,14 @@ export default function AuthVendorPage() {
   function onSignup(data: z.infer<typeof signupSchema>) {
     signupMutation.mutate({ data }, {
       onSuccess: (res) => {
-        login(res.token, res.user.role as 'vendor', res.user.businessName || res.user.name);
+        login(res.token, 'vendor', res.name);
         toast({ title: "Restaurant account created successfully!" });
         setLocation("/vendor/dashboard");
       },
       onError: (err) => {
         toast({ 
           title: "Signup failed", 
-          description: err.data?.message || "Could not create account",
+          description: err.data?.error || "Could not create account",
           variant: "destructive" 
         });
       }
@@ -142,7 +144,7 @@ export default function AuthVendorPage() {
                 <form onSubmit={signupForm.handleSubmit(onSignup)} className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 pb-2">
                   <FormField
                     control={signupForm.control}
-                    name="name"
+                    name="ownerName"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Owner Name</FormLabel>
@@ -174,6 +176,19 @@ export default function AuthVendorPage() {
                         <FormLabel>Password</FormLabel>
                         <FormControl>
                           <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="0801 234 5678" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

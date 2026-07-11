@@ -25,7 +25,7 @@ export default function VendorCustomersPage() {
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-[200px]">Customer Name</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Active Plan</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -46,12 +46,12 @@ export default function VendorCustomersPage() {
                   customers.map((customer, i) => (
                     <TableRow key={i} className="hover:bg-muted/30">
                       <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{customer.email}</TableCell>
+                      <TableCell className="text-muted-foreground">{customer.phone || 'N/A'}</TableCell>
                       <TableCell>
                         <span className="font-serif">{customer.planName}</span>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {customer.subscriptionStart ? format(new Date(customer.subscriptionStart), 'MMM dd, yyyy') : 'N/A'}
+                        {customer.startDate ? format(new Date(customer.startDate), 'MMM dd, yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
                         <Badge 

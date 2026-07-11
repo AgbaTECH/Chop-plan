@@ -1,0 +1,1 @@
+- [Chop Plan app conventions](chop-plan-conventions.md) — seeding via executeSql (not pg/node scripts); generated hooks with `enabled` need explicit `queryKey`.
