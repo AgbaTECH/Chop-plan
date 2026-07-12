@@ -7,6 +7,7 @@ import {
   subscriptionsTable,
 } from "@workspace/db";
 import { eq, ilike, and, sql } from "drizzle-orm";
+import { toCustomerDisplayPriceNaira } from "../lib/pricing";
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.get("/vendors", async (req, res) => {
         coverImage: v.coverImage ?? "",
         rating: v.rating,
         subscriberCount: count,
-        lowestPlanPrice: lowestPlan?.price ?? 0,
+        lowestPlanPrice: lowestPlan ? toCustomerDisplayPriceNaira(lowestPlan.price) : 0,
         description: v.description ?? null,
       };
     })
@@ -94,14 +95,14 @@ router.get("/vendors/:vendorId", async (req, res) => {
       name: p.name,
       daysPerMonth: p.daysPerMonth,
       freeDays: p.freeDays,
-      priceNaira: p.priceNaira,
+      priceNaira: toCustomerDisplayPriceNaira(p.priceNaira),
       includesDelivery: p.includesDelivery,
     })),
     meals: meals.map((m) => ({
       id: m.id,
       name: m.name,
       description: m.description,
-      priceNaira: m.priceNaira,
+      priceNaira: toCustomerDisplayPriceNaira(m.priceNaira),
       imageUrl: m.imageUrl,
       available: m.available,
       category: m.category ?? null,
@@ -121,7 +122,7 @@ router.get("/vendors/:vendorId/meals", async (req, res) => {
       id: m.id,
       name: m.name,
       description: m.description,
-      priceNaira: m.priceNaira,
+      priceNaira: toCustomerDisplayPriceNaira(m.priceNaira),
       imageUrl: m.imageUrl,
       available: m.available,
       category: m.category ?? null,
@@ -142,7 +143,7 @@ router.get("/vendors/:vendorId/plans", async (req, res) => {
       name: p.name,
       daysPerMonth: p.daysPerMonth,
       freeDays: p.freeDays,
-      priceNaira: p.priceNaira,
+      priceNaira: toCustomerDisplayPriceNaira(p.priceNaira),
       includesDelivery: p.includesDelivery,
     }))
   );

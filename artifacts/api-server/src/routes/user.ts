@@ -10,6 +10,7 @@ import {
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { totalScheduleDays, buildScheduleRows } from "../lib/schedule";
+import { toCustomerDisplayPriceNaira } from "../lib/pricing";
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.get("/user/subscriptions", requireAuth("user"), async (req: AuthRequest, 
       planName: s.planName,
       daysPerMonth: s.daysPerMonth,
       freeDays: s.freeDays,
-      priceNaira: s.priceNaira,
+      priceNaira: toCustomerDisplayPriceNaira(s.priceNaira),
       startDate: typeof s.startDate === "string" ? s.startDate : s.startDate,
       status: s.status as "active" | "paused" | "cancelled",
     }))
@@ -97,7 +98,7 @@ router.post("/user/subscriptions", requireAuth("user"), async (req: AuthRequest,
     planName: plan.name,
     daysPerMonth: plan.daysPerMonth,
     freeDays: plan.freeDays,
-    priceNaira: plan.priceNaira,
+    priceNaira: toCustomerDisplayPriceNaira(plan.priceNaira),
     startDate: sub.startDate,
     status: sub.status as "active",
   });
