@@ -83,12 +83,14 @@ export default function UserDashboardPage() {
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
 
-  // Redirect if not user
+  // Redirect if not a signed-in customer
   useEffect(() => {
     if (!isAuthenticated) {
       setLocation("/auth/user");
     } else if (role === "vendor") {
       setLocation("/vendor/dashboard");
+    } else if (role === "admin") {
+      setLocation("/admin/dashboard");
     }
   }, [isAuthenticated, role, setLocation]);
 
@@ -276,7 +278,7 @@ export default function UserDashboardPage() {
               <h3 className="text-2xl font-serif font-bold mb-2">No active meals</h3>
               <p className="text-muted-foreground max-w-sm mx-auto mb-6">You aren't subscribed to any meal plans right now. Find a restaurant to get started.</p>
               <Button asChild className="font-mono">
-                <Link href="/vendors">Browse Restaurants</Link>
+                <Link href="/vendors">Find Restaurants</Link>
               </Button>
             </div>
           )}

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Users, CreditCard, UtensilsCrossed, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -9,10 +9,20 @@ interface VendorLayoutProps {
 }
 
 export function VendorLayout({ children, title }: VendorLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { isAuthenticated, role, name } = useAuth();
 
-  // Basic guard, real guard should be at page level or router
+  // Redirect anyone who isn't a signed-in vendor away from vendor-only pages.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLocation("/auth/vendor");
+    } else if (role === "user") {
+      setLocation("/vendors");
+    } else if (role === "admin") {
+      setLocation("/admin/dashboard");
+    }
+  }, [isAuthenticated, role, setLocation]);
+
   if (!isAuthenticated || role !== "vendor") {
     return null;
   }

@@ -1,7 +1,21 @@
-import { Link } from "wouter";
+import { useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 
 export default function HomePage() {
+  const [, setLocation] = useLocation();
+  const { isAuthenticated, role } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (role === "vendor") setLocation("/vendor/dashboard");
+    else if (role === "admin") setLocation("/admin/dashboard");
+    else setLocation("/vendors");
+  }, [isAuthenticated, role, setLocation]);
+
+  if (isAuthenticated) return null;
+
   return (
     <div className="flex flex-col w-full">
       {/* Hero Section */}
@@ -17,7 +31,7 @@ export default function HomePage() {
           
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" className="h-14 px-8 text-lg font-mono">
-              <Link href="/vendors">Browse Restaurants</Link>
+              <Link href="/vendors">Find Restaurants</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="h-14 px-8 text-lg font-mono bg-background">
               <Link href="/auth/vendor">Partner With Us</Link>
@@ -63,13 +77,16 @@ export default function HomePage() {
             </p>
             <ul className="space-y-4 mb-10 text-lg">
               <li className="flex items-center gap-3">
-                <span className="text-primary font-bold">✓</span> Upfront capital for ingredients
+                <span className="text-primary font-bold">✓</span> No upfront cost to get started
               </li>
               <li className="flex items-center gap-3">
-                <span className="text-primary font-bold">✓</span> Zero food waste with exact order counts
+                <span className="text-primary font-bold">✓</span> Guaranteed repeat customers through prepaid plans
               </li>
               <li className="flex items-center gap-3">
-                <span className="text-primary font-bold">✓</span> Direct relationship with your customers
+                <span className="text-primary font-bold">✓</span> Built-in exposure to office workers looking for lunch
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-primary font-bold">✓</span> Predictable, recurring revenue every month
               </li>
             </ul>
             <Button asChild size="lg" className="h-14 px-8 text-lg font-mono bg-primary text-primary-foreground hover:bg-primary/90">

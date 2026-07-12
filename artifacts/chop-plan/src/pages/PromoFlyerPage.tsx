@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useSubmitLead } from "@workspace/api-client-react";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,11 +47,23 @@ const differentiators = [
 export default function PromoFlyerPage() {
   const { toast } = useToast();
   const submitLead = useSubmitLead();
+  const [, setLocation] = useLocation();
+  const { isAuthenticated, role } = useAuth();
+
+  // This is a logged-out marketing page; move signed-in users to their real home screen.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (role === "vendor") setLocation("/vendor/dashboard");
+    else if (role === "admin") setLocation("/admin/dashboard");
+    else setLocation("/vendors");
+  }, [isAuthenticated, role, setLocation]);
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
     defaultValues: { name: "", phone: "", email: "" },
   });
+
+  if (isAuthenticated) return null;
 
   function onSubmit(data: LeadFormValues) {
     submitLead.mutate({ data }, {

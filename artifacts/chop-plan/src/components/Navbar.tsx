@@ -24,15 +24,39 @@ export default function Navbar() {
     });
   };
 
-  const links = [
+  const loggedOutLinks = [
     { href: "/", label: "Home" },
-    { href: "/vendors", label: "Vendors" },
+    { href: "/vendors", label: "Find Restaurant" },
     { href: "/blog", label: "Blog" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" },
     { href: "/support", label: "Support" },
     { href: "/get-started", label: "Get Started" },
   ];
+
+  const loggedInLinks: Record<"user" | "vendor" | "admin", { href: string; label: string }[]> = {
+    user: [
+      { href: "/vendors", label: "Find Restaurant" },
+      { href: "/dashboard", label: "My Subscriptions" },
+      { href: "/support", label: "Support" },
+    ],
+    vendor: [
+      { href: "/vendor/dashboard", label: "Dashboard" },
+      { href: "/vendor/meals", label: "Menu & Plans" },
+      { href: "/vendor/customers", label: "Customers" },
+      { href: "/vendor/earnings", label: "Earnings" },
+      { href: "/vendor/wallet", label: "Wallet" },
+      { href: "/support", label: "Support" },
+    ],
+    admin: [
+      { href: "/admin/dashboard", label: "Dashboard" },
+      { href: "/admin/vendors", label: "Vendors" },
+      { href: "/admin/customers", label: "Customers" },
+      { href: "/admin/leads", label: "Leads" },
+    ],
+  };
+
+  const links = isAuthenticated && role ? loggedInLinks[role] : loggedOutLinks;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -58,13 +82,10 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated ? (
             <div className="flex items-center gap-4">
-              <Link 
-                href={role === "vendor" ? "/vendor/dashboard" : role === "admin" ? "/admin/dashboard" : "/dashboard"}
-                className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2"
-              >
+              <span className="text-sm font-medium flex items-center gap-2">
                 <User className="h-4 w-4" />
-                <span>{name || "Dashboard"}</span>
-              </Link>
+                <span>{name || "Account"}</span>
+              </span>
               <Button variant="outline" size="sm" onClick={handleLogout} className="gap-2">
                 <LogOut className="h-4 w-4" />
                 Logout
@@ -107,12 +128,10 @@ export default function Navbar() {
               <div className="mt-auto flex flex-col gap-4 pb-8">
                 {isAuthenticated ? (
                   <>
-                    <Button asChild variant="outline" className="w-full justify-start text-lg h-12">
-                      <Link href={role === "vendor" ? "/vendor/dashboard" : role === "admin" ? "/admin/dashboard" : "/dashboard"} onClick={() => setIsOpen(false)}>
-                        <User className="h-5 w-5 mr-3" />
-                        {name || "Dashboard"}
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-3 text-lg font-medium px-1">
+                      <User className="h-5 w-5" />
+                      {name || "Account"}
+                    </div>
                     <Button variant="destructive" className="w-full justify-start text-lg h-12" onClick={handleLogout}>
                       <LogOut className="h-5 w-5 mr-3" />
                       Logout

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Store, Users, UserPlus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -9,8 +9,19 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, title }: AdminLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { isAuthenticated, role, name } = useAuth();
+
+  // Redirect anyone who isn't a signed-in admin away from admin-only pages.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLocation("/auth/admin");
+    } else if (role === "vendor") {
+      setLocation("/vendor/dashboard");
+    } else if (role === "user") {
+      setLocation("/vendors");
+    }
+  }, [isAuthenticated, role, setLocation]);
 
   if (!isAuthenticated || role !== "admin") {
     return null;
