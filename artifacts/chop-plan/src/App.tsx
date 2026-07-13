@@ -18,6 +18,7 @@ import AuthVendorPage from './pages/AuthVendorPage';
 import AuthAdminPage from './pages/AuthAdminPage';
 import VendorsPage from './pages/VendorsPage';
 import VendorDetailPage from './pages/VendorDetailPage';
+import CheckoutCallbackPage from './pages/CheckoutCallbackPage';
 import UserDashboardPage from './pages/UserDashboardPage';
 import VendorDashboardPage from './pages/VendorDashboardPage';
 import VendorCustomersPage from './pages/VendorCustomersPage';
@@ -56,6 +57,7 @@ function Router() {
           
           <Route path="/vendors" component={VendorsPage} />
           <Route path="/vendors/:id" component={VendorDetailPage} />
+          <Route path="/checkout/callback" component={CheckoutCallbackPage} />
           
           <Route path="/dashboard" component={UserDashboardPage} />
           

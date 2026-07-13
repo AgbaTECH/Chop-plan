@@ -290,24 +290,34 @@ export const ListUserSubscriptionsResponse = zod.array(ListUserSubscriptionsResp
 
 
 /**
- * @summary Subscribe to a vendor plan
+ * Initiates a real Paystack payment for the customer-facing price. No subscription is created yet — it only activates once Paystack confirms the charge succeeded. Redirect the customer to authorizationUrl to complete payment.
+ * @summary Start a Paystack checkout for a vendor plan
  */
-export const CreateSubscriptionBody = zod.object({
+export const CheckoutSubscriptionBody = zod.object({
   "vendorId": zod.number(),
-  "planId": zod.number()
+  "planId": zod.number(),
+  "callbackUrl": zod.string().describe('Where Paystack should redirect the customer after checkout')
 })
 
-export const CreateSubscriptionResponse = zod.object({
-  "id": zod.number(),
-  "vendorId": zod.number(),
-  "vendorName": zod.string(),
-  "vendorCoverImage": zod.string().nullish(),
-  "planName": zod.string(),
-  "daysPerMonth": zod.number(),
-  "freeDays": zod.number(),
-  "priceNaira": zod.number(),
-  "startDate": zod.coerce.date(),
-  "status": zod.enum(['active', 'paused', 'cancelled'])
+export const CheckoutSubscriptionResponse = zod.object({
+  "reference": zod.string(),
+  "authorizationUrl": zod.string(),
+  "amountNaira": zod.number()
+})
+
+
+/**
+ * Fallback for the checkout callback screen. Independently confirms the transaction's status directly with Paystack and activates the subscription if needed — safe to call even if the webhook has already processed it.
+ * @summary Verify a Paystack payment and activate its subscription if successful
+ */
+export const VerifyPaymentParams = zod.object({
+  "reference": zod.coerce.string()
+})
+
+export const VerifyPaymentResponse = zod.object({
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "subscriptionId": zod.number().nullable(),
+  "message": zod.string().nullable()
 })
 
 

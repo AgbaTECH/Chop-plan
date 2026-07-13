@@ -352,23 +352,83 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/UserSubscription"
+  /user/subscriptions/checkout:
     post:
-      operationId: createSubscription
+      operationId: checkoutSubscription
       tags: [user]
-      summary: Subscribe to a vendor plan
+      summary: Start a Paystack checkout for a vendor plan
+      description: >
+        Initiates a real Paystack payment for the customer-facing price.
+        No subscription is created yet — it only activates once Paystack
+        confirms the charge succeeded. Redirect the customer to
+        authorizationUrl to complete payment.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SubscriptionInput"
+              $ref: "#/components/schemas/CheckoutInput"
       responses:
         "201":
-          description: Created
+          description: Checkout started
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserSubscription"
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor or plan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Paystack error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /user/payments/{reference}/verify:
+    get:
+      operationId: verifyPayment
+      tags: [user]
+      summary: Verify a Paystack payment and activate its subscription if successful
+      description: >
+        Fallback for the checkout callback screen. Independently confirms
+        the transaction's status directly with Paystack and activates the
+        subscription if needed — safe to call even if the webhook has
+        already processed it.
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentStatus"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Paystack error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /user/subscriptions/{subscriptionId}:
     delete:
@@ -1145,14 +1205,40 @@ components:
           type: string
           enum: [active, paused, cancelled]
 
-    SubscriptionInput:
+    CheckoutInput:
       type: object
-      required: [vendorId, planId]
+      required: [vendorId, planId, callbackUrl]
       properties:
         vendorId:
           type: integer
         planId:
           type: integer
+        callbackUrl:
+          type: string
+          description: Where Paystack should redirect the customer after checkout
+
+    CheckoutResponse:
+      type: object
+      required: [reference, authorizationUrl, amountNaira]
+      properties:
+        reference:
+          type: string
+        authorizationUrl:
+          type: string
+        amountNaira:
+          type: integer
+
+    PaymentStatus:
+      type: object
+      required: [status, subscriptionId, message]
+      properties:
+        status:
+          type: string
+          enum: [pending, success, failed]
+        subscriptionId:
+          type: ["integer", "null"]
+        message:
+          type: ["string", "null"]
 
     # ── Vendor dashboard ──────────────────────────────────────────────────
     VendorProfile:

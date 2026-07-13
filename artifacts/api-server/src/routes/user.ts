@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -6,11 +7,14 @@ import {
   vendorsTable,
   subscriptionPlansTable,
   subscriptionDaysTable,
+  paymentsTable,
 } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { totalScheduleDays, buildScheduleRows } from "../lib/schedule";
 import { toCustomerDisplayPriceNaira } from "../lib/pricing";
+import { initializeTransaction, verifyTransaction, PaystackError } from "../lib/paystack";
+import { activatePaymentSuccess, markPaymentFailed } from "../lib/payment-activation";
 
 const router = Router();
 
@@ -69,39 +73,101 @@ router.get("/user/subscriptions", requireAuth("user"), async (req: AuthRequest, 
   );
 });
 
-// POST /user/subscriptions
-router.post("/user/subscriptions", requireAuth("user"), async (req: AuthRequest, res) => {
-  const { vendorId, planId } = req.body;
+// POST /user/subscriptions/checkout
+// Starts a real Paystack payment for the customer-facing price. No
+// subscription is created here — it's only created once Paystack confirms
+// the charge succeeded (see activatePaymentSuccess, invoked from the webhook
+// or the verify endpoint below).
+router.post("/user/subscriptions/checkout", requireAuth("user"), async (req: AuthRequest, res) => {
+  const { vendorId, planId, callbackUrl } = req.body;
   if (!vendorId || !planId) {
     res.status(400).json({ error: "vendorId and planId required" });
     return;
   }
-  const today = new Date().toISOString().split("T")[0];
-  const [sub] = await db
-    .insert(subscriptionsTable)
-    .values({ userId: req.session!.id, vendorId, planId, startDate: today, status: "active" })
-    .returning();
-
-  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
-  const [plan] = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.id, planId));
-
-  const scheduleRows = buildScheduleRows(sub.id, sub.startDate, totalScheduleDays(plan.daysPerMonth, plan.freeDays));
-  if (scheduleRows.length > 0) {
-    await db.insert(subscriptionDaysTable).values(scheduleRows);
+  if (!callbackUrl || typeof callbackUrl !== "string") {
+    res.status(400).json({ error: "callbackUrl required" });
+    return;
   }
 
-  res.status(201).json({
-    id: sub.id,
-    vendorId: sub.vendorId,
-    vendorName: vendor.businessName,
-    vendorCoverImage: vendor.coverImage ?? null,
-    planName: plan.name,
-    daysPerMonth: plan.daysPerMonth,
-    freeDays: plan.freeDays,
-    priceNaira: toCustomerDisplayPriceNaira(plan.priceNaira),
-    startDate: sub.startDate,
-    status: sub.status as "active",
-  });
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session!.id));
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
+  const [plan] = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.id, planId));
+  if (!user || !vendor || !plan) {
+    res.status(404).json({ error: "Vendor or plan not found" });
+    return;
+  }
+  if (plan.vendorId !== vendor.id) {
+    res.status(400).json({ error: "This plan does not belong to the selected vendor" });
+    return;
+  }
+
+  const amountNaira = toCustomerDisplayPriceNaira(plan.priceNaira);
+  const reference = `chopplan_${crypto.randomUUID()}`;
+
+  const [payment] = await db
+    .insert(paymentsTable)
+    .values({ userId: user.id, vendorId, planId, reference, amountNaira, status: "pending" })
+    .returning();
+
+  try {
+    const tx = await initializeTransaction({
+      email: user.email,
+      amountNaira,
+      reference: payment.reference,
+      callbackUrl,
+      metadata: { userId: user.id, vendorId, planId, planName: plan.name },
+    });
+    res.status(201).json({
+      reference: payment.reference,
+      authorizationUrl: tx.authorizationUrl,
+      amountNaira,
+    });
+  } catch (err) {
+    await markPaymentFailed(payment, err instanceof PaystackError ? err.message : "Failed to start checkout");
+    res.status(502).json({ error: err instanceof PaystackError ? err.message : "Failed to start checkout with Paystack" });
+  }
+});
+
+// GET /user/payments/:reference/verify
+// Fallback for the checkout-callback screen: independently confirms the
+// transaction's status directly with Paystack (never trusts the client) and
+// activates the subscription if it succeeded but the webhook hasn't landed
+// yet. Idempotent — safe to call repeatedly or race with the webhook.
+router.get("/user/payments/:reference/verify", requireAuth("user"), async (req: AuthRequest, res) => {
+  const reference = String(req.params.reference);
+  const [payment] = await db
+    .select()
+    .from(paymentsTable)
+    .where(and(eq(paymentsTable.reference, reference), eq(paymentsTable.userId, req.session!.id)));
+  if (!payment) {
+    res.status(404).json({ error: "Payment not found" });
+    return;
+  }
+
+  if (payment.status === "success") {
+    res.json({ status: "success", subscriptionId: payment.subscriptionId, message: null });
+    return;
+  }
+  if (payment.status === "failed") {
+    res.json({ status: "failed", subscriptionId: null, message: payment.failureReason ?? "Payment failed" });
+    return;
+  }
+
+  try {
+    const result = await verifyTransaction(reference);
+    if (result.status === "success") {
+      const { subscriptionId } = await activatePaymentSuccess(payment);
+      res.json({ status: "success", subscriptionId, message: null });
+    } else if (result.status === "failed" || result.status === "abandoned") {
+      const message = result.gatewayResponse || "Payment was declined or abandoned";
+      await markPaymentFailed(payment, message);
+      res.json({ status: "failed", subscriptionId: null, message });
+    } else {
+      res.json({ status: "pending", subscriptionId: null, message: null });
+    }
+  } catch (err) {
+    res.status(502).json({ error: err instanceof PaystackError ? err.message : "Failed to verify payment with Paystack" });
+  }
 });
 
 // DELETE /user/subscriptions/:subscriptionId

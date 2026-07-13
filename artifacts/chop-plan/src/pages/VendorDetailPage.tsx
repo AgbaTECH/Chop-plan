@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation } from "wouter";
-import { useGetVendor, useCreateSubscription, getGetVendorQueryKey } from "@workspace/api-client-react";
+import { useGetVendor, useCheckoutSubscription, getGetVendorQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ export default function VendorDetailPage() {
     query: { enabled: !isNaN(id), queryKey: getGetVendorQueryKey(id) }
   });
 
-  const createSubscription = useCreateSubscription();
+  const checkoutSubscription = useCheckoutSubscription();
 
   const handleSubscribe = async () => {
     if (!isAuthenticated) {
@@ -44,17 +44,15 @@ export default function VendorDetailPage() {
     if (!selectedPlanId) return;
 
     setIsSubmitting(true);
-    createSubscription.mutate({ data: { vendorId: id, planId: selectedPlanId } }, {
-      onSuccess: () => {
-        toast({
-          title: "Subscription Confirmed!",
-          description: "Your lunch is sorted. You can manage this in your dashboard."
-        });
-        setLocation("/dashboard");
+    const callbackUrl = `${window.location.origin}${import.meta.env.BASE_URL}checkout/callback`;
+    checkoutSubscription.mutate({ data: { vendorId: id, planId: selectedPlanId, callbackUrl } }, {
+      onSuccess: (data) => {
+        // Redirect to Paystack's hosted checkout page to complete payment.
+        window.location.href = data.authorizationUrl;
       },
       onError: (err: any) => {
         toast({
-          title: "Subscription failed",
+          title: "Could not start checkout",
           description: err?.data?.error || "Please try again later.",
           variant: "destructive"
         });
@@ -252,7 +250,7 @@ export default function VendorDetailPage() {
                                     disabled={isSubmitting}
                                     data-testid="button-confirm-subscription"
                                   >
-                                    {isSubmitting ? "Processing..." : "Pay & Confirm"}
+                                    {isSubmitting ? "Redirecting to payment..." : "Proceed to Payment"}
                                   </Button>
                                 ) : (
                                   <Button asChild className="w-full font-mono">

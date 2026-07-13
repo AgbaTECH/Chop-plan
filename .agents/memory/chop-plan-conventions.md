@@ -1,17 +1,16 @@
 ---
-name: Chop Plan app conventions and sandbox quirks
-description: DB seeding approach and a generated-hook typing quirk relevant to any pnpm-monorepo artifact using @workspace/api-client-react + Drizzle/Postgres.
+name: Chop Plan app conventions
+description: Seeding, generated-hooks, and payment/subscription conventions for the Chop Plan app (artifacts/chop-plan + artifacts/api-server).
 ---
 
-- The CodeExecution sandbox's plain Node context cannot import the `pg` npm package, and running compiled server scripts (e.g. `node dist/index.mjs`) outside the workflow fails because `PORT` isn't set there. For one-off DB seeding/fixes from the agent, use the `executeSql` callback with parameterized/escaped SQL instead of writing a Node/Drizzle script.
-  **Why:** confirmed by repeated failures trying both approaches during a data-seeding pass.
-  **How to apply:** when asked to seed or backfill data in a Postgres-backed artifact, reach for `executeSql` first rather than authoring a seed script.
+- Seed data via the `executeSql` CodeExecution callback, not standalone pg/node scripts.
+- Generated React Query hooks (orval) that pass `enabled` need an explicit `queryKey` too — `enabled` alone doesn't stabilize the key.
+- Customer-facing prices must always go through the hidden-platform-fee display-price helper; vendor-facing/payout paths use the raw stored price. Any new customer-facing read path (or payment charge amount) must use the display price, not the raw one.
 
-- Generated react-query hooks from `@workspace/api-client-react` (orval-style codegen) that accept a dynamic path param (e.g. `useGetBlogPost(id, { query: { enabled } })`) require an explicit `queryKey` in the `query` options when `enabled` is also passed — TS complains `Property 'queryKey' is missing` otherwise. Import the paired `getGet<X>QueryKey(id)` helper and pass `queryKey: getGet<X>QueryKey(id)`.
-  **Why:** the generated types don't infer a default queryKey once you override `query` with `enabled`.
-  **How to apply:** anywhere you conditionally fetch by a parsed route param with one of these generated hooks.
+## Paystack checkout (real payments)
 
-- `seed.ts` inserts fixture rows directly rather than going through the runtime create routes, so any feature that generates derived rows on creation (e.g. a schedule/ledger table populated when a parent record is created) needs its generation logic added to the seed script too, or fixture data silently diverges from what real usage produces.
-  **Why:** the seed script and the live API are separate code paths; adding logic to one doesn't propagate to the other automatically.
-  **How to apply:** whenever a "generate related rows on create" feature is added anywhere in this app, check `seed.ts` for the same entity and update it in the same change, reusing the shared helper the runtime route uses rather than re-deriving the logic.
-  Also seed a bootstrap admin/owner account (using a secret-provided password, e.g. `process.env.ADMIN_PASSWORD`, with a dev-only fallback) whenever an admin-gated area is added, so a fresh environment has usable credentials immediately.
+A subscription is only ever created after Paystack confirms the charge succeeded — never speculatively. Activation (creating the subscription + its schedule) must be a single idempotent, transactionally-locked operation, since both the webhook and a client-triggered verify fallback can race to activate the same payment.
+
+**Why:** per Paystack's own docs, webhooks are only reliably sent for successful transactions, and hosted-checkout `callback_url` redirects only fire on success too — declines are retried in-page on Paystack's own UI, and abandoned sessions never call back at all. A manual "verify with Paystack directly" endpoint is the only reliable way to learn a transaction never completed, so both that endpoint and the webhook must be able to safely race without double-creating a subscription.
+
+**How to apply:** any future work touching subscriptions/payments (e.g. vendor withdrawals, recurring billing) should keep using the same idempotent activation path rather than inserting subscription rows directly elsewhere. Also always validate that a plan actually belongs to the vendor it's being purchased under before charging.

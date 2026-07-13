@@ -164,9 +164,34 @@ export interface UserSubscription {
   status: UserSubscriptionStatus;
 }
 
-export interface SubscriptionInput {
+export interface CheckoutInput {
   vendorId: number;
   planId: number;
+  /** Where Paystack should redirect the customer after checkout */
+  callbackUrl: string;
+}
+
+export interface CheckoutResponse {
+  reference: string;
+  authorizationUrl: string;
+  amountNaira: number;
+}
+
+export type PaymentStatusStatus = typeof PaymentStatusStatus[keyof typeof PaymentStatusStatus];
+
+
+export const PaymentStatusStatus = {
+  pending: 'pending',
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+export interface PaymentStatus {
+  status: PaymentStatusStatus;
+  /** @nullable */
+  subscriptionId: number | null;
+  /** @nullable */
+  message: string | null;
 }
 
 export interface VendorProfile {

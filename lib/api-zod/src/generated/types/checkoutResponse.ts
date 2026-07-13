@@ -6,7 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SubscriptionInput {
-  vendorId: number;
-  planId: number;
+export interface CheckoutResponse {
+  reference: string;
+  authorizationUrl: string;
+  amountNaira: number;
 }

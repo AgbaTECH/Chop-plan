@@ -28,6 +28,8 @@ import type {
   AdminVendorInput,
   AuthResponse,
   BlogPost,
+  CheckoutInput,
+  CheckoutResponse,
   ContactInput,
   ErrorResponse,
   HealthStatus,
@@ -38,8 +40,8 @@ import type {
   Meal,
   MealInput,
   MealUpdate,
+  PaymentStatus,
   ScheduleDay,
-  SubscriptionInput,
   SubscriptionPlan,
   SuccessResponse,
   UserProfile,
@@ -1282,25 +1284,26 @@ export function useListUserSubscriptions<TData = Awaited<ReturnType<typeof listU
 
 
 
-export const getCreateSubscriptionUrl = () => {
+export const getCheckoutSubscriptionUrl = () => {
 
 
 
 
-  return `/api/user/subscriptions`
+  return `/api/user/subscriptions/checkout`
 }
 
 /**
- * @summary Subscribe to a vendor plan
+ * Initiates a real Paystack payment for the customer-facing price. No subscription is created yet — it only activates once Paystack confirms the charge succeeded. Redirect the customer to authorizationUrl to complete payment.
+ * @summary Start a Paystack checkout for a vendor plan
  */
-export const createSubscription = async (subscriptionInput: SubscriptionInput, options?: RequestInit): Promise<UserSubscription> => {
+export const checkoutSubscription = async (checkoutInput: CheckoutInput, options?: RequestInit): Promise<CheckoutResponse> => {
 
-  return customFetch<UserSubscription>(getCreateSubscriptionUrl(),
+  return customFetch<CheckoutResponse>(getCheckoutSubscriptionUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(subscriptionInput)
+    body: JSON.stringify(checkoutInput)
   }
 );}
 
@@ -1308,11 +1311,11 @@ export const createSubscription = async (subscriptionInput: SubscriptionInput, o
 
 
 
-export const getCreateSubscriptionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscription>>, TError,{data: BodyType<SubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createSubscription>>, TError,{data: BodyType<SubscriptionInput>}, TContext> => {
+export const getCheckoutSubscriptionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutSubscription>>, TError,{data: BodyType<CheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkoutSubscription>>, TError,{data: BodyType<CheckoutInput>}, TContext> => {
 
-const mutationKey = ['createSubscription'];
+const mutationKey = ['checkoutSubscription'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1322,10 +1325,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubscription>>, {data: BodyType<SubscriptionInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkoutSubscription>>, {data: BodyType<CheckoutInput>}> = (props) => {
           const {data} = props ?? {};
 
-          return  createSubscription(data,requestOptions)
+          return  checkoutSubscription(data,requestOptions)
         }
 
 
@@ -1335,23 +1338,101 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CreateSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof createSubscription>>>
-    export type CreateSubscriptionMutationBody = BodyType<SubscriptionInput>
-    export type CreateSubscriptionMutationError = ErrorType<unknown>
+    export type CheckoutSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof checkoutSubscription>>>
+    export type CheckoutSubscriptionMutationBody = BodyType<CheckoutInput>
+    export type CheckoutSubscriptionMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Subscribe to a vendor plan
+ * @summary Start a Paystack checkout for a vendor plan
  */
-export const useCreateSubscription = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubscription>>, TError,{data: BodyType<SubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useCheckoutSubscription = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutSubscription>>, TError,{data: BodyType<CheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof createSubscription>>,
+        Awaited<ReturnType<typeof checkoutSubscription>>,
         TError,
-        {data: BodyType<SubscriptionInput>},
+        {data: BodyType<CheckoutInput>},
         TContext
       > => {
-      return useMutation(getCreateSubscriptionMutationOptions(options));
+      return useMutation(getCheckoutSubscriptionMutationOptions(options));
     }
+
+export const getVerifyPaymentUrl = (reference: string,) => {
+
+
+
+
+  return `/api/user/payments/${reference}/verify`
+}
+
+/**
+ * Fallback for the checkout callback screen. Independently confirms the transaction's status directly with Paystack and activates the subscription if needed — safe to call even if the webhook has already processed it.
+ * @summary Verify a Paystack payment and activate its subscription if successful
+ */
+export const verifyPayment = async (reference: string, options?: RequestInit): Promise<PaymentStatus> => {
+
+  return customFetch<PaymentStatus>(getVerifyPaymentUrl(reference),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyPaymentQueryKey = (reference: string,) => {
+    return [
+    `/api/user/payments/${reference}/verify`
+    ] as const;
+    }
+
+
+export const getVerifyPaymentQueryOptions = <TData = Awaited<ReturnType<typeof verifyPayment>>, TError = ErrorType<ErrorResponse>>(reference: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyPayment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyPaymentQueryKey(reference);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyPayment>>> = ({ signal }) => verifyPayment(reference, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: reference !== null && reference !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyPayment>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyPaymentQueryResult = NonNullable<Awaited<ReturnType<typeof verifyPayment>>>
+export type VerifyPaymentQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Verify a Paystack payment and activate its subscription if successful
+ */
+
+export function useVerifyPayment<TData = Awaited<ReturnType<typeof verifyPayment>>, TError = ErrorType<ErrorResponse>>(
+ reference: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyPayment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyPaymentQueryOptions(reference,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getCancelSubscriptionUrl = (subscriptionId: number,) => {
 
