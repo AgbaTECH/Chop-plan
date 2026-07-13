@@ -303,7 +303,14 @@ export const GetVendorResponse = zod.object({
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
   "priceNaira": zod.number(),
-  "includesDelivery": zod.boolean()
+  "includesDelivery": zod.boolean(),
+  "menuItems": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "imageUrl": zod.string(),
+  "category": zod.string().nullable()
+})).optional()
 })),
   "meals": zod.array(zod.object({
   "id": zod.number(),
@@ -349,7 +356,14 @@ export const ListVendorPlansResponseItem = zod.object({
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
   "priceNaira": zod.number(),
-  "includesDelivery": zod.boolean()
+  "includesDelivery": zod.boolean(),
+  "menuItems": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "imageUrl": zod.string(),
+  "category": zod.string().nullable()
+})).optional()
 })
 export const ListVendorPlansResponse = zod.array(ListVendorPlansResponseItem)
 
@@ -577,6 +591,38 @@ export const GetVendorEarningsResponse = zod.object({
   "subscriberCount": zod.number(),
   "revenueNaira": zod.number()
 }))
+})
+
+
+/**
+ * @summary Get vendor's own plans with their assigned menu items
+ */
+export const ListMyPlansResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "priceNaira": zod.number(),
+  "includesDelivery": zod.boolean(),
+  "mealIds": zod.array(zod.number())
+})
+export const ListMyPlansResponse = zod.array(ListMyPlansResponseItem)
+
+
+/**
+ * @summary Set the menu items included in a plan tier
+ */
+export const SetPlanMealsParams = zod.object({
+  "planId": zod.coerce.number()
+})
+
+export const SetPlanMealsBody = zod.object({
+  "mealIds": zod.array(zod.number())
+})
+
+export const SetPlanMealsResponse = zod.object({
+  "planId": zod.number(),
+  "mealIds": zod.array(zod.number())
 })
 
 

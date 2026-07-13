@@ -856,6 +856,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/VendorEarnings"
 
+  /vendor/plans:
+    get:
+      operationId: listMyPlans
+      tags: [vendor]
+      summary: Get vendor's own plans with their assigned menu items
+      responses:
+        "200":
+          description: Plan list with meal assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VendorPlanWithMeals"
+
+  /vendor/plans/{planId}/meals:
+    put:
+      operationId: setPlanMeals
+      tags: [vendor]
+      summary: Set the menu items included in a plan tier
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPlanMealsInput"
+      responses:
+        "200":
+          description: Updated plan meal assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanMealsResult"
+        "404":
+          description: Plan not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /vendor/meals:
     get:
       operationId: listMyMeals
@@ -1461,6 +1507,66 @@ components:
           type: integer
         includesDelivery:
           type: boolean
+        menuItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanMenuItem"
+
+    PlanMenuItem:
+      type: object
+      required: [id, name, description, imageUrl, category]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        category:
+          type: ["string", "null"]
+
+    VendorPlanWithMeals:
+      type: object
+      required: [id, name, daysPerMonth, freeDays, priceNaira, includesDelivery, mealIds]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        priceNaira:
+          type: integer
+        includesDelivery:
+          type: boolean
+        mealIds:
+          type: array
+          items:
+            type: integer
+
+    SetPlanMealsInput:
+      type: object
+      required: [mealIds]
+      properties:
+        mealIds:
+          type: array
+          items:
+            type: integer
+
+    PlanMealsResult:
+      type: object
+      required: [planId, mealIds]
+      properties:
+        planId:
+          type: integer
+        mealIds:
+          type: array
+          items:
+            type: integer
 
     Meal:
       type: object

@@ -5,8 +5,9 @@ import {
   subscriptionPlansTable,
   mealsTable,
   subscriptionsTable,
+  planMealsTable,
 } from "@workspace/db";
-import { eq, ilike, and, sql } from "drizzle-orm";
+import { eq, ilike, and, sql, inArray } from "drizzle-orm";
 import { toCustomerDisplayPriceNaira } from "../lib/pricing";
 
 const router = Router();
@@ -81,6 +82,21 @@ router.get("/vendors/:vendorId", async (req, res) => {
     .from(subscriptionsTable)
     .where(and(eq(subscriptionsTable.vendorId, vendorId), eq(subscriptionsTable.status, "active")));
 
+  const mealsById = new Map(meals.map((m) => [m.id, m]));
+  const planIds = plans.map((p) => p.id);
+  const links = planIds.length > 0
+    ? await db
+        .select({ planId: planMealsTable.planId, mealId: planMealsTable.mealId })
+        .from(planMealsTable)
+        .where(inArray(planMealsTable.planId, planIds))
+    : [];
+  const mealIdsByPlan = new Map<number, number[]>();
+  for (const link of links) {
+    const list = mealIdsByPlan.get(link.planId) ?? [];
+    list.push(link.mealId);
+    mealIdsByPlan.set(link.planId, list);
+  }
+
   res.json({
     id: vendor.id,
     businessName: vendor.businessName,
@@ -97,6 +113,16 @@ router.get("/vendors/:vendorId", async (req, res) => {
       freeDays: p.freeDays,
       priceNaira: toCustomerDisplayPriceNaira(p.priceNaira),
       includesDelivery: p.includesDelivery,
+      menuItems: (mealIdsByPlan.get(p.id) ?? [])
+        .map((mealId) => mealsById.get(mealId))
+        .filter((m): m is typeof meals[number] => Boolean(m))
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          description: m.description,
+          imageUrl: m.imageUrl,
+          category: m.category ?? null,
+        })),
     })),
     meals: meals.map((m) => ({
       id: m.id,

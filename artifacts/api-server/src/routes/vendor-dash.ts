@@ -8,8 +8,9 @@ import {
   usersTable,
   subscriptionDaysTable,
   vendorWithdrawalsTable,
+  planMealsTable,
 } from "@workspace/db";
-import { eq, and, sql, asc, desc } from "drizzle-orm";
+import { eq, and, sql, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { perDayShareNaira } from "../lib/schedule";
 
@@ -160,6 +161,75 @@ router.get("/vendor/earnings", requireAuth("vendor"), async (req: AuthRequest, r
   }));
 
   res.json({ weekly, monthly, weeklyByPlan, monthlyByPlan });
+});
+
+// GET /vendor/plans
+router.get("/vendor/plans", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const plans = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.vendorId, vendorId));
+  if (plans.length === 0) {
+    res.json([]);
+    return;
+  }
+  const planIds = plans.map((p) => p.id);
+  const links = await db
+    .select({ planId: planMealsTable.planId, mealId: planMealsTable.mealId })
+    .from(planMealsTable)
+    .where(inArray(planMealsTable.planId, planIds));
+  const mealIdsByPlan = new Map<number, number[]>();
+  for (const link of links) {
+    const list = mealIdsByPlan.get(link.planId) ?? [];
+    list.push(link.mealId);
+    mealIdsByPlan.set(link.planId, list);
+  }
+  res.json(plans.map((p) => ({
+    id: p.id,
+    name: p.name,
+    daysPerMonth: p.daysPerMonth,
+    freeDays: p.freeDays,
+    priceNaira: p.priceNaira,
+    includesDelivery: p.includesDelivery,
+    mealIds: mealIdsByPlan.get(p.id) ?? [],
+  })));
+});
+
+// PUT /vendor/plans/:planId/meals
+router.put("/vendor/plans/:planId/meals", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const planId = Number(req.params.planId);
+  const mealIdsInput = req.body?.mealIds;
+  if (!Array.isArray(mealIdsInput) || !mealIdsInput.every((id) => typeof id === "number")) {
+    res.status(400).json({ error: "mealIds must be an array of numbers" });
+    return;
+  }
+  const mealIds = [...new Set(mealIdsInput)];
+
+  const [plan] = await db
+    .select()
+    .from(subscriptionPlansTable)
+    .where(and(eq(subscriptionPlansTable.id, planId), eq(subscriptionPlansTable.vendorId, vendorId)));
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+
+  if (mealIds.length > 0) {
+    const ownedMeals = await db
+      .select({ id: mealsTable.id })
+      .from(mealsTable)
+      .where(and(inArray(mealsTable.id, mealIds), eq(mealsTable.vendorId, vendorId)));
+    if (ownedMeals.length !== mealIds.length) {
+      res.status(400).json({ error: "One or more meals do not belong to this vendor" });
+      return;
+    }
+  }
+
+  await db.delete(planMealsTable).where(eq(planMealsTable.planId, planId));
+  if (mealIds.length > 0) {
+    await db.insert(planMealsTable).values(mealIds.map((mealId) => ({ planId, mealId })));
+  }
+
+  res.json({ planId, mealIds });
 });
 
 // GET /vendor/meals

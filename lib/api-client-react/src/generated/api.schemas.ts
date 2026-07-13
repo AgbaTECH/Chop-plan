@@ -126,6 +126,15 @@ export interface Vendor {
   description?: string | null;
 }
 
+export interface PlanMenuItem {
+  id: number;
+  name: string;
+  description: string;
+  imageUrl: string;
+  /** @nullable */
+  category: string | null;
+}
+
 export interface SubscriptionPlan {
   id: number;
   name: string;
@@ -133,6 +142,7 @@ export interface SubscriptionPlan {
   freeDays: number;
   priceNaira: number;
   includesDelivery: boolean;
+  menuItems?: PlanMenuItem[];
 }
 
 export interface Meal {
@@ -157,6 +167,25 @@ export interface VendorDetail {
   description: string;
   plans: SubscriptionPlan[];
   meals: Meal[];
+}
+
+export interface VendorPlanWithMeals {
+  id: number;
+  name: string;
+  daysPerMonth: number;
+  freeDays: number;
+  priceNaira: number;
+  includesDelivery: boolean;
+  mealIds: number[];
+}
+
+export interface SetPlanMealsInput {
+  mealIds: number[];
+}
+
+export interface PlanMealsResult {
+  planId: number;
+  mealIds: number[];
 }
 
 export interface UserProfile {

@@ -200,9 +200,26 @@ export default function VendorDetailPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="pb-4">
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground mb-3">
                           {plan.freeDays} free days included{plan.includesDelivery ? " · Delivery included" : ""}
                         </p>
+                        {plan.menuItems && plan.menuItems.length > 0 ? (
+                          <div className="space-y-1.5 border-t border-border pt-3">
+                            <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-1.5">What's included</p>
+                            <ul className="space-y-1">
+                              {plan.menuItems.map((item) => (
+                                <li key={item.id} className="text-sm flex items-start gap-1.5">
+                                  <span className="text-primary mt-0.5">•</span>
+                                  <span>{item.name}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic border-t border-border pt-3">
+                            Menu for this plan hasn't been set up yet.
+                          </p>
+                        )}
                       </CardContent>
                       <CardFooter>
                         {true ? (

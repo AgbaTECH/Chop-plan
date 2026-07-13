@@ -42,9 +42,11 @@ import type {
   MealInput,
   MealUpdate,
   PaymentStatus,
+  PlanMealsResult,
   ResendOtpInput,
   ResetPasswordInput,
   ScheduleDay,
+  SetPlanMealsInput,
   SignupResponse,
   SubscriptionPlan,
   SuccessResponse,
@@ -58,6 +60,7 @@ import type {
   VendorDashboard,
   VendorDetail,
   VendorEarnings,
+  VendorPlanWithMeals,
   VendorProfile,
   VendorProfileUpdate,
   VendorSignupInput,
@@ -2607,6 +2610,155 @@ export function useGetVendorEarnings<TData = Awaited<ReturnType<typeof getVendor
 
 
 
+
+export const getListMyPlansUrl = () => {
+
+
+
+
+  return `/api/vendor/plans`
+}
+
+/**
+ * @summary Get vendor's own plans with their assigned menu items
+ */
+export const listMyPlans = async ( options?: RequestInit): Promise<VendorPlanWithMeals[]> => {
+
+  return customFetch<VendorPlanWithMeals[]>(getListMyPlansUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyPlansQueryKey = () => {
+    return [
+    `/api/vendor/plans`
+    ] as const;
+    }
+
+
+export const getListMyPlansQueryOptions = <TData = Awaited<ReturnType<typeof listMyPlans>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyPlans>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyPlansQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyPlans>>> = ({ signal }) => listMyPlans({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyPlans>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyPlansQueryResult = NonNullable<Awaited<ReturnType<typeof listMyPlans>>>
+export type ListMyPlansQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get vendor's own plans with their assigned menu items
+ */
+
+export function useListMyPlans<TData = Awaited<ReturnType<typeof listMyPlans>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyPlans>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyPlansQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetPlanMealsUrl = (planId: number,) => {
+
+
+
+
+  return `/api/vendor/plans/${planId}/meals`
+}
+
+/**
+ * @summary Set the menu items included in a plan tier
+ */
+export const setPlanMeals = async (planId: number,
+    setPlanMealsInput: SetPlanMealsInput, options?: RequestInit): Promise<PlanMealsResult> => {
+
+  return customFetch<PlanMealsResult>(getSetPlanMealsUrl(planId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setPlanMealsInput)
+  }
+);}
+
+
+
+
+
+export const getSetPlanMealsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPlanMeals>>, TError,{planId: number;data: BodyType<SetPlanMealsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setPlanMeals>>, TError,{planId: number;data: BodyType<SetPlanMealsInput>}, TContext> => {
+
+const mutationKey = ['setPlanMeals'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setPlanMeals>>, {planId: number;data: BodyType<SetPlanMealsInput>}> = (props) => {
+          const {planId,data} = props ?? {};
+
+          return  setPlanMeals(planId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetPlanMealsMutationResult = NonNullable<Awaited<ReturnType<typeof setPlanMeals>>>
+    export type SetPlanMealsMutationBody = BodyType<SetPlanMealsInput>
+    export type SetPlanMealsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Set the menu items included in a plan tier
+ */
+export const useSetPlanMeals = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPlanMeals>>, TError,{planId: number;data: BodyType<SetPlanMealsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setPlanMeals>>,
+        TError,
+        {planId: number;data: BodyType<SetPlanMealsInput>},
+        TContext
+      > => {
+      return useMutation(getSetPlanMealsMutationOptions(options));
+    }
 
 export const getListMyMealsUrl = () => {
 

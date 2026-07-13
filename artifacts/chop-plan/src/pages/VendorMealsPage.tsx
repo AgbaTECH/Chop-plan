@@ -5,8 +5,13 @@ import {
   useCreateMeal,
   useUpdateMeal,
   useDeleteMeal,
+  useListMyPlans,
+  useSetPlanMeals,
+  getListMyPlansQueryKey,
   Meal,
+  VendorPlanWithMeals,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, UtensilsCrossed } from "lucide-react";
+import { Plus, Pencil, Trash2, UtensilsCrossed, ClipboardList } from "lucide-react";
 
 type MealForm = {
   name: string;
@@ -241,6 +247,160 @@ export default function VendorMealsPage() {
           </Button>
         </div>
       )}
+
+      <div className="mt-12 pt-8 border-t border-border">
+        <div className="mb-6">
+          <h2 className="text-2xl font-serif font-bold flex items-center gap-2">
+            <ClipboardList className="w-6 h-6 text-primary" />
+            Kitchen Profile Per Plan
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Choose which of your meals customers see included at each plan tier, so they know what to expect before subscribing.
+          </p>
+        </div>
+        <PlanMealsManager meals={meals ?? []} />
+      </div>
     </VendorLayout>
+  );
+}
+
+function PlanMealsManager({ meals }: { meals: Meal[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: plans, isLoading } = useListMyPlans();
+  const setPlanMeals = useSetPlanMeals();
+
+  const [editingPlan, setEditingPlan] = useState<VendorPlanWithMeals | null>(null);
+  const [selectedMealIds, setSelectedMealIds] = useState<number[]>([]);
+
+  const openEdit = (plan: VendorPlanWithMeals) => {
+    setEditingPlan(plan);
+    setSelectedMealIds(plan.mealIds);
+  };
+
+  const toggleMeal = (mealId: number) => {
+    setSelectedMealIds((prev) =>
+      prev.includes(mealId) ? prev.filter((id) => id !== mealId) : [...prev, mealId]
+    );
+  };
+
+  const handleSave = () => {
+    if (!editingPlan) return;
+    setPlanMeals.mutate(
+      { planId: editingPlan.id, data: { mealIds: selectedMealIds } },
+      {
+        onSuccess: () => {
+          toast({ title: `${editingPlan.name} menu updated` });
+          queryClient.invalidateQueries({ queryKey: getListMyPlansQueryKey() });
+          setEditingPlan(null);
+        },
+        onError: () => toast({ title: "Failed to update plan menu", variant: "destructive" }),
+      }
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 w-full" />)}
+      </div>
+    );
+  }
+
+  if (!plans || plans.length === 0) {
+    return (
+      <div className="text-center py-16 bg-card rounded-xl border border-dashed border-border">
+        <ClipboardList className="w-10 h-10 mx-auto text-muted-foreground mb-3 opacity-50" />
+        <p className="text-muted-foreground">You don't have any plan tiers set up yet.</p>
+      </div>
+    );
+  }
+
+  const mealsById = new Map(meals.map((m) => [m.id, m]));
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {plans.map((plan) => (
+          <Card key={plan.id} className="border-border">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start gap-2">
+                <CardTitle className="text-lg font-serif">{plan.name}</CardTitle>
+                <Badge variant="secondary" className="font-mono text-[10px] shrink-0">
+                  {plan.mealIds.length} item{plan.mealIds.length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pb-2">
+              {plan.mealIds.length > 0 ? (
+                <ul className="text-sm text-muted-foreground space-y-1 mb-2">
+                  {plan.mealIds.slice(0, 3).map((id) => (
+                    <li key={id} className="truncate">• {mealsById.get(id)?.name ?? "Deleted meal"}</li>
+                  ))}
+                  {plan.mealIds.length > 3 && (
+                    <li className="text-xs italic">+{plan.mealIds.length - 3} more</li>
+                  )}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground italic mb-2">No meals assigned yet</p>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full font-mono"
+                onClick={() => openEdit(plan)}
+                data-testid={`button-edit-plan-menu-${plan.id}`}
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Menu
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={editingPlan !== null} onOpenChange={(open) => !open && setEditingPlan(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">
+              {editingPlan?.name} — Included Meals
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+            {meals.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                Add meals to your menu first, then come back to assign them to this plan.
+              </p>
+            ) : (
+              meals.map((meal) => (
+                <label
+                  key={meal.id}
+                  className="flex items-center gap-3 p-2.5 rounded-md border border-border hover:bg-muted/50 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedMealIds.includes(meal.id)}
+                    onCheckedChange={() => toggleMeal(meal.id)}
+                    data-testid={`checkbox-plan-meal-${meal.id}`}
+                  />
+                  <span className="text-sm">{meal.name}</span>
+                </label>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="font-mono" onClick={() => setEditingPlan(null)}>Cancel</Button>
+            <Button
+              className="font-mono"
+              onClick={handleSave}
+              disabled={setPlanMeals.isPending}
+              data-testid="button-save-plan-menu"
+            >
+              {setPlanMeals.isPending ? "Saving..." : "Save Menu"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
