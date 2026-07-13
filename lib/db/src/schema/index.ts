@@ -10,3 +10,4 @@ export * from "./schedule";
 export * from "./wallet";
 export * from "./leads";
 export * from "./payments";
+export * from "./verification-codes";

@@ -32,6 +32,7 @@ import type {
   CheckoutResponse,
   ContactInput,
   ErrorResponse,
+  ForgotPasswordInput,
   HealthStatus,
   LeadInput,
   ListVendorsParams,
@@ -41,9 +42,13 @@ import type {
   MealInput,
   MealUpdate,
   PaymentStatus,
+  ResendOtpInput,
+  ResetPasswordInput,
   ScheduleDay,
+  SignupResponse,
   SubscriptionPlan,
   SuccessResponse,
+  UnverifiedResponse,
   UserProfile,
   UserProfileUpdate,
   UserSignupInput,
@@ -57,6 +62,7 @@ import type {
   VendorProfileUpdate,
   VendorSignupInput,
   VendorWallet,
+  VerifyInput,
   WithdrawInput
 } from './api.schemas';
 
@@ -175,9 +181,9 @@ export const getUserSignupUrl = () => {
 /**
  * @summary Register a new user
  */
-export const userSignup = async (userSignupInput: UserSignupInput, options?: RequestInit): Promise<AuthResponse> => {
+export const userSignup = async (userSignupInput: UserSignupInput, options?: RequestInit): Promise<SignupResponse> => {
 
-  return customFetch<AuthResponse>(getUserSignupUrl(),
+  return customFetch<SignupResponse>(getUserSignupUrl(),
   {
     ...options,
     method: 'POST',
@@ -261,7 +267,7 @@ export const userLogin = async (loginInput: LoginInput, options?: RequestInit): 
 
 
 
-export const getUserLoginMutationOptions = <TError = ErrorType<ErrorResponse>,
+export const getUserLoginMutationOptions = <TError = ErrorType<ErrorResponse | UnverifiedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userLogin>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof userLogin>>, TError,{data: BodyType<LoginInput>}, TContext> => {
 
@@ -290,12 +296,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UserLoginMutationResult = NonNullable<Awaited<ReturnType<typeof userLogin>>>
     export type UserLoginMutationBody = BodyType<LoginInput>
-    export type UserLoginMutationError = ErrorType<ErrorResponse>
+    export type UserLoginMutationError = ErrorType<ErrorResponse | UnverifiedResponse>
 
     /**
  * @summary Login as a user
  */
-export const useUserLogin = <TError = ErrorType<ErrorResponse>,
+export const useUserLogin = <TError = ErrorType<ErrorResponse | UnverifiedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userLogin>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof userLogin>>,
@@ -304,6 +310,290 @@ export const useUserLogin = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUserLoginMutationOptions(options));
+    }
+
+export const getUserVerifyUrl = () => {
+
+
+
+
+  return `/api/auth/user/verify`
+}
+
+/**
+ * @summary Verify a user's signup OTP
+ */
+export const userVerify = async (verifyInput: VerifyInput, options?: RequestInit): Promise<AuthResponse> => {
+
+  return customFetch<AuthResponse>(getUserVerifyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(verifyInput)
+  }
+);}
+
+
+
+
+
+export const getUserVerifyMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userVerify>>, TError,{data: BodyType<VerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof userVerify>>, TError,{data: BodyType<VerifyInput>}, TContext> => {
+
+const mutationKey = ['userVerify'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof userVerify>>, {data: BodyType<VerifyInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  userVerify(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UserVerifyMutationResult = NonNullable<Awaited<ReturnType<typeof userVerify>>>
+    export type UserVerifyMutationBody = BodyType<VerifyInput>
+    export type UserVerifyMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Verify a user's signup OTP
+ */
+export const useUserVerify = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userVerify>>, TError,{data: BodyType<VerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof userVerify>>,
+        TError,
+        {data: BodyType<VerifyInput>},
+        TContext
+      > => {
+      return useMutation(getUserVerifyMutationOptions(options));
+    }
+
+export const getUserResendOtpUrl = () => {
+
+
+
+
+  return `/api/auth/user/resend-otp`
+}
+
+/**
+ * @summary Resend a user's signup verification code
+ */
+export const userResendOtp = async (resendOtpInput: ResendOtpInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getUserResendOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resendOtpInput)
+  }
+);}
+
+
+
+
+
+export const getUserResendOtpMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userResendOtp>>, TError,{data: BodyType<ResendOtpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof userResendOtp>>, TError,{data: BodyType<ResendOtpInput>}, TContext> => {
+
+const mutationKey = ['userResendOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof userResendOtp>>, {data: BodyType<ResendOtpInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  userResendOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UserResendOtpMutationResult = NonNullable<Awaited<ReturnType<typeof userResendOtp>>>
+    export type UserResendOtpMutationBody = BodyType<ResendOtpInput>
+    export type UserResendOtpMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Resend a user's signup verification code
+ */
+export const useUserResendOtp = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userResendOtp>>, TError,{data: BodyType<ResendOtpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof userResendOtp>>,
+        TError,
+        {data: BodyType<ResendOtpInput>},
+        TContext
+      > => {
+      return useMutation(getUserResendOtpMutationOptions(options));
+    }
+
+export const getUserForgotPasswordUrl = () => {
+
+
+
+
+  return `/api/auth/user/forgot-password`
+}
+
+/**
+ * @summary Request a password reset code for a user
+ */
+export const userForgotPassword = async (forgotPasswordInput: ForgotPasswordInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getUserForgotPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(forgotPasswordInput)
+  }
+);}
+
+
+
+
+
+export const getUserForgotPasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userForgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof userForgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext> => {
+
+const mutationKey = ['userForgotPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof userForgotPassword>>, {data: BodyType<ForgotPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  userForgotPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UserForgotPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof userForgotPassword>>>
+    export type UserForgotPasswordMutationBody = BodyType<ForgotPasswordInput>
+    export type UserForgotPasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Request a password reset code for a user
+ */
+export const useUserForgotPassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userForgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof userForgotPassword>>,
+        TError,
+        {data: BodyType<ForgotPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getUserForgotPasswordMutationOptions(options));
+    }
+
+export const getUserResetPasswordUrl = () => {
+
+
+
+
+  return `/api/auth/user/reset-password`
+}
+
+/**
+ * @summary Reset a user's password with a reset code
+ */
+export const userResetPassword = async (resetPasswordInput: ResetPasswordInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getUserResetPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resetPasswordInput)
+  }
+);}
+
+
+
+
+
+export const getUserResetPasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userResetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof userResetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext> => {
+
+const mutationKey = ['userResetPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof userResetPassword>>, {data: BodyType<ResetPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  userResetPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UserResetPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof userResetPassword>>>
+    export type UserResetPasswordMutationBody = BodyType<ResetPasswordInput>
+    export type UserResetPasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Reset a user's password with a reset code
+ */
+export const useUserResetPassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof userResetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof userResetPassword>>,
+        TError,
+        {data: BodyType<ResetPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getUserResetPasswordMutationOptions(options));
     }
 
 export const getVendorSignupUrl = () => {
@@ -317,9 +607,9 @@ export const getVendorSignupUrl = () => {
 /**
  * @summary Register a new vendor
  */
-export const vendorSignup = async (vendorSignupInput: VendorSignupInput, options?: RequestInit): Promise<AuthResponse> => {
+export const vendorSignup = async (vendorSignupInput: VendorSignupInput, options?: RequestInit): Promise<SignupResponse> => {
 
-  return customFetch<AuthResponse>(getVendorSignupUrl(),
+  return customFetch<SignupResponse>(getVendorSignupUrl(),
   {
     ...options,
     method: 'POST',
@@ -403,7 +693,7 @@ export const vendorLogin = async (loginInput: LoginInput, options?: RequestInit)
 
 
 
-export const getVendorLoginMutationOptions = <TError = ErrorType<ErrorResponse>,
+export const getVendorLoginMutationOptions = <TError = ErrorType<ErrorResponse | UnverifiedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorLogin>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof vendorLogin>>, TError,{data: BodyType<LoginInput>}, TContext> => {
 
@@ -432,12 +722,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type VendorLoginMutationResult = NonNullable<Awaited<ReturnType<typeof vendorLogin>>>
     export type VendorLoginMutationBody = BodyType<LoginInput>
-    export type VendorLoginMutationError = ErrorType<ErrorResponse>
+    export type VendorLoginMutationError = ErrorType<ErrorResponse | UnverifiedResponse>
 
     /**
  * @summary Login as a vendor
  */
-export const useVendorLogin = <TError = ErrorType<ErrorResponse>,
+export const useVendorLogin = <TError = ErrorType<ErrorResponse | UnverifiedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorLogin>>, TError,{data: BodyType<LoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof vendorLogin>>,
@@ -446,6 +736,290 @@ export const useVendorLogin = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getVendorLoginMutationOptions(options));
+    }
+
+export const getVendorVerifyUrl = () => {
+
+
+
+
+  return `/api/auth/vendor/verify`
+}
+
+/**
+ * @summary Verify a vendor's signup OTP
+ */
+export const vendorVerify = async (verifyInput: VerifyInput, options?: RequestInit): Promise<AuthResponse> => {
+
+  return customFetch<AuthResponse>(getVendorVerifyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(verifyInput)
+  }
+);}
+
+
+
+
+
+export const getVendorVerifyMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorVerify>>, TError,{data: BodyType<VerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof vendorVerify>>, TError,{data: BodyType<VerifyInput>}, TContext> => {
+
+const mutationKey = ['vendorVerify'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof vendorVerify>>, {data: BodyType<VerifyInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  vendorVerify(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VendorVerifyMutationResult = NonNullable<Awaited<ReturnType<typeof vendorVerify>>>
+    export type VendorVerifyMutationBody = BodyType<VerifyInput>
+    export type VendorVerifyMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Verify a vendor's signup OTP
+ */
+export const useVendorVerify = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorVerify>>, TError,{data: BodyType<VerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof vendorVerify>>,
+        TError,
+        {data: BodyType<VerifyInput>},
+        TContext
+      > => {
+      return useMutation(getVendorVerifyMutationOptions(options));
+    }
+
+export const getVendorResendOtpUrl = () => {
+
+
+
+
+  return `/api/auth/vendor/resend-otp`
+}
+
+/**
+ * @summary Resend a vendor's signup verification code
+ */
+export const vendorResendOtp = async (resendOtpInput: ResendOtpInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getVendorResendOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resendOtpInput)
+  }
+);}
+
+
+
+
+
+export const getVendorResendOtpMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorResendOtp>>, TError,{data: BodyType<ResendOtpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof vendorResendOtp>>, TError,{data: BodyType<ResendOtpInput>}, TContext> => {
+
+const mutationKey = ['vendorResendOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof vendorResendOtp>>, {data: BodyType<ResendOtpInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  vendorResendOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VendorResendOtpMutationResult = NonNullable<Awaited<ReturnType<typeof vendorResendOtp>>>
+    export type VendorResendOtpMutationBody = BodyType<ResendOtpInput>
+    export type VendorResendOtpMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Resend a vendor's signup verification code
+ */
+export const useVendorResendOtp = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorResendOtp>>, TError,{data: BodyType<ResendOtpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof vendorResendOtp>>,
+        TError,
+        {data: BodyType<ResendOtpInput>},
+        TContext
+      > => {
+      return useMutation(getVendorResendOtpMutationOptions(options));
+    }
+
+export const getVendorForgotPasswordUrl = () => {
+
+
+
+
+  return `/api/auth/vendor/forgot-password`
+}
+
+/**
+ * @summary Request a password reset code for a vendor
+ */
+export const vendorForgotPassword = async (forgotPasswordInput: ForgotPasswordInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getVendorForgotPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(forgotPasswordInput)
+  }
+);}
+
+
+
+
+
+export const getVendorForgotPasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorForgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof vendorForgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext> => {
+
+const mutationKey = ['vendorForgotPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof vendorForgotPassword>>, {data: BodyType<ForgotPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  vendorForgotPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VendorForgotPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof vendorForgotPassword>>>
+    export type VendorForgotPasswordMutationBody = BodyType<ForgotPasswordInput>
+    export type VendorForgotPasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Request a password reset code for a vendor
+ */
+export const useVendorForgotPassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorForgotPassword>>, TError,{data: BodyType<ForgotPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof vendorForgotPassword>>,
+        TError,
+        {data: BodyType<ForgotPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getVendorForgotPasswordMutationOptions(options));
+    }
+
+export const getVendorResetPasswordUrl = () => {
+
+
+
+
+  return `/api/auth/vendor/reset-password`
+}
+
+/**
+ * @summary Reset a vendor's password with a reset code
+ */
+export const vendorResetPassword = async (resetPasswordInput: ResetPasswordInput, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getVendorResetPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resetPasswordInput)
+  }
+);}
+
+
+
+
+
+export const getVendorResetPasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorResetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof vendorResetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext> => {
+
+const mutationKey = ['vendorResetPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof vendorResetPassword>>, {data: BodyType<ResetPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  vendorResetPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VendorResetPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof vendorResetPassword>>>
+    export type VendorResetPasswordMutationBody = BodyType<ResetPasswordInput>
+    export type VendorResetPasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Reset a vendor's password with a reset code
+ */
+export const useVendorResetPassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vendorResetPassword>>, TError,{data: BodyType<ResetPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof vendorResetPassword>>,
+        TError,
+        {data: BodyType<ResetPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getVendorResetPasswordMutationOptions(options));
     }
 
 export const getLogoutUrl = () => {

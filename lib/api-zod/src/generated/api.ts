@@ -32,11 +32,9 @@ export const UserSignupBody = zod.object({
 })
 
 export const UserSignupResponse = zod.object({
-  "token": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
-  "id": zod.number(),
-  "name": zod.string(),
-  "email": zod.string()
+  "requiresVerification": zod.boolean(),
+  "email": zod.string(),
+  "message": zod.string()
 })
 
 
@@ -54,6 +52,68 @@ export const UserLoginResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string()
+})
+
+
+/**
+ * @summary Verify a user's signup OTP
+ */
+export const UserVerifyBody = zod.object({
+  "email": zod.string(),
+  "code": zod.string()
+})
+
+export const UserVerifyResponse = zod.object({
+  "token": zod.string(),
+  "role": zod.enum(['user', 'vendor', 'admin']),
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
+ * @summary Resend a user's signup verification code
+ */
+export const UserResendOtpBody = zod.object({
+  "email": zod.string()
+})
+
+export const UserResendOtpResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Request a password reset code for a user
+ */
+export const UserForgotPasswordBody = zod.object({
+  "email": zod.string()
+})
+
+export const UserForgotPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Reset a user's password with a reset code
+ */
+export const userResetPasswordBodyNewPasswordMin = 6;
+
+
+
+export const UserResetPasswordBody = zod.object({
+  "email": zod.string(),
+  "code": zod.string(),
+  "newPassword": zod.string().min(userResetPasswordBodyNewPasswordMin)
+})
+
+export const UserResetPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
 })
 
 
@@ -76,11 +136,9 @@ export const VendorSignupBody = zod.object({
 })
 
 export const VendorSignupResponse = zod.object({
-  "token": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
-  "id": zod.number(),
-  "name": zod.string(),
-  "email": zod.string()
+  "requiresVerification": zod.boolean(),
+  "email": zod.string(),
+  "message": zod.string()
 })
 
 
@@ -98,6 +156,68 @@ export const VendorLoginResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "email": zod.string()
+})
+
+
+/**
+ * @summary Verify a vendor's signup OTP
+ */
+export const VendorVerifyBody = zod.object({
+  "email": zod.string(),
+  "code": zod.string()
+})
+
+export const VendorVerifyResponse = zod.object({
+  "token": zod.string(),
+  "role": zod.enum(['user', 'vendor', 'admin']),
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
+ * @summary Resend a vendor's signup verification code
+ */
+export const VendorResendOtpBody = zod.object({
+  "email": zod.string()
+})
+
+export const VendorResendOtpResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Request a password reset code for a vendor
+ */
+export const VendorForgotPasswordBody = zod.object({
+  "email": zod.string()
+})
+
+export const VendorForgotPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Reset a vendor's password with a reset code
+ */
+export const vendorResetPasswordBodyNewPasswordMin = 6;
+
+
+
+export const VendorResetPasswordBody = zod.object({
+  "email": zod.string(),
+  "code": zod.string(),
+  "newPassword": zod.string().min(vendorResetPasswordBodyNewPasswordMin)
+})
+
+export const VendorResetPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
 })
 
 

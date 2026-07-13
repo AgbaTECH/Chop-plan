@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, varchar, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, real, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,7 @@ export const vendorsTable = pgTable("vendors", {
   description: text("description"),
   coverImage: text("cover_image"),
   rating: real("rating").default(4.5).notNull(),
+  verified: boolean("verified").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -62,6 +62,38 @@ export interface AuthResponse {
   email: string;
 }
 
+export interface SignupResponse {
+  requiresVerification: boolean;
+  email: string;
+  message: string;
+}
+
+export interface UnverifiedResponse {
+  error: string;
+  requiresVerification: boolean;
+  email: string;
+}
+
+export interface VerifyInput {
+  email: string;
+  code: string;
+}
+
+export interface ResendOtpInput {
+  email: string;
+}
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  email: string;
+  code: string;
+  /** @minLength 6 */
+  newPassword: string;
+}
+
 export type MeResponseRole = typeof MeResponseRole[keyof typeof MeResponseRole];
 
 

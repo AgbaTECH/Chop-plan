@@ -14,3 +14,11 @@ A subscription is only ever created after Paystack confirms the charge succeeded
 **Why:** per Paystack's own docs, webhooks are only reliably sent for successful transactions, and hosted-checkout `callback_url` redirects only fire on success too — declines are retried in-page on Paystack's own UI, and abandoned sessions never call back at all. A manual "verify with Paystack directly" endpoint is the only reliable way to learn a transaction never completed, so both that endpoint and the webhook must be able to safely race without double-creating a subscription.
 
 **How to apply:** any future work touching subscriptions/payments (e.g. vendor withdrawals, recurring billing) should keep using the same idempotent activation path rather than inserting subscription rows directly elsewhere. Also always validate that a plan actually belongs to the vendor it's being purchased under before charging.
+
+## Resend email (OTP / password reset)
+
+The project's Resend connection is in sandbox mode (no verified domain): sending from `onboarding@resend.dev` only succeeds when the recipient is the account owner's own verified email — sends to any other address fail with a 403. This is a real, current limitation, not a bug in app code.
+
+**Why:** discovered while building signup-OTP/password-reset email delivery — every send to a test/customer address failed until domain verification is done in Resend's dashboard.
+
+**How to apply:** don't trust "the email API call succeeded" during dev testing unless sending to the account owner's address; use a temporary server-side log of the generated code (removed before shipping) or a DB query to get the plaintext-equivalent for manual verification instead. A follow-up task tracks doing the domain verification for real delivery.
