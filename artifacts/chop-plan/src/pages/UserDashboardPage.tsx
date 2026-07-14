@@ -11,6 +11,8 @@ import {
   useListAlacarteOrders,
   useConfirmAlacartePickup,
   getGetUserSubscriptionScheduleQueryKey,
+  getListUserSubscriptionsQueryKey,
+  getListAlacarteOrdersQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -105,8 +107,14 @@ export default function UserDashboardPage() {
   }, [isAuthenticated, role, setLocation]);
 
   const { data: profile, isLoading: profileLoading } = useGetMe();
-  const { data: subscriptions, isLoading: subsLoading } = useListUserSubscriptions();
-  const { data: alacarteOrders, isLoading: alacarteLoading } = useListAlacarteOrders();
+  // Poll so subscription/order status (pickup confirmations, vendor
+  // notifications) updates automatically without a manual page reload.
+  const { data: subscriptions, isLoading: subsLoading } = useListUserSubscriptions({
+    query: { refetchInterval: 15000, queryKey: getListUserSubscriptionsQueryKey() },
+  });
+  const { data: alacarteOrders, isLoading: alacarteLoading } = useListAlacarteOrders({
+    query: { refetchInterval: 15000, queryKey: getListAlacarteOrdersQueryKey() },
+  });
   const updateProfile = useUpdateUserProfile();
   const cancelSub = useCancelSubscription();
   const confirmAlacarte = useConfirmAlacartePickup();
@@ -169,17 +177,19 @@ export default function UserDashboardPage() {
       </div>
 
       <Tabs defaultValue="subscriptions" className="w-full">
-        <TabsList className="mb-8 font-mono border-b rounded-none bg-transparent h-12 w-full justify-start gap-8">
-          <TabsTrigger value="subscriptions" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0">
-            My Subscriptions
-          </TabsTrigger>
-          <TabsTrigger value="alacarte" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0" data-testid="tab-alacarte-orders">
-            À La Carte Orders
-          </TabsTrigger>
-          <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0">
-            Profile Settings
-          </TabsTrigger>
-        </TabsList>
+        <div className="mb-8 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="font-mono border-b rounded-none bg-transparent h-12 w-max sm:w-full justify-start gap-6 sm:gap-8">
+            <TabsTrigger value="subscriptions" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap">
+              My Subscriptions
+            </TabsTrigger>
+            <TabsTrigger value="alacarte" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap" data-testid="tab-alacarte-orders">
+              À La Carte Orders
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap">
+              Profile Settings
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="subscriptions" className="space-y-6">
           <div className="flex justify-between items-center mb-6">
@@ -326,9 +336,9 @@ export default function UserDashboardPage() {
                 return (
                   <Card key={order.id} className="border-border">
                     <CardContent className="p-5">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <Badge variant={order.status === "success" ? "default" : order.status === "failed" ? "destructive" : "secondary"} className="font-mono text-xs uppercase">
                               {order.status}
                             </Badge>
@@ -336,7 +346,7 @@ export default function UserDashboardPage() {
                               <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Picked Up</Badge>
                             )}
                           </div>
-                          <h3 className="text-lg font-serif font-bold">
+                          <h3 className="text-lg font-serif font-bold break-words">
                             {order.mealName || "Meal"} <span className="text-muted-foreground font-normal text-sm">from</span> {order.vendorName}
                           </h3>
                           <p className="text-sm text-muted-foreground mt-1">
@@ -347,7 +357,7 @@ export default function UserDashboardPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="font-mono shrink-0"
+                            className="font-mono shrink-0 w-full sm:w-auto"
                             onClick={() => handleConfirmAlacarte(order.id)}
                             disabled={confirmAlacarte.isPending}
                             data-testid={`button-confirm-alacarte-order-${order.id}`}
@@ -412,11 +422,11 @@ export default function UserDashboardPage() {
                 </>
               )}
             </CardContent>
-            <CardFooter className="bg-muted/30 border-t px-6 py-4">
+            <CardFooter className="bg-muted/30 border-t px-4 sm:px-6 py-4">
               <Button 
                 onClick={handleUpdateProfile} 
                 disabled={profileLoading || updateProfile.isPending || profileName === profile?.name}
-                className="font-mono ml-auto"
+                className="font-mono w-full sm:w-auto sm:ml-auto"
                 data-testid="button-save-profile"
               >
                 {updateProfile.isPending ? "Saving..." : "Save Changes"}

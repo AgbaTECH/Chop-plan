@@ -30,7 +30,11 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function VendorWalletPage() {
-  const { data: wallet, isLoading } = useGetVendorWallet();
+  // Poll so a vendor's balance updates automatically as customers confirm
+  // pickups, instead of only refreshing on a manual page reload.
+  const { data: wallet, isLoading } = useGetVendorWallet({
+    query: { refetchInterval: 15000, queryKey: getGetVendorWalletQueryKey() },
+  });
   const { data: bankAccount, isLoading: bankLoading } = useGetVendorBankAccount();
   const withdraw = useWithdrawFromWallet();
   const { toast } = useToast();

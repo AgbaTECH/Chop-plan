@@ -68,3 +68,19 @@ When `artifacts/api-server` typecheck fails with `TS6305: Output file '.../lib/d
 **Why:** `lib/db`'s `tsconfig.json` is `composite: true` with incremental builds; a stale `tsconfig.tsbuildinfo` at the package root makes `tsc` think the (now-deleted) output is still current, so it skips re-emitting and `dist/` stays empty/stale.
 
 **How to apply:** from `lib/db/`, run `rm -f tsconfig.tsbuildinfo && rm -rf dist && npx tsc -p tsconfig.json`, then re-run the dependent package's typecheck. Deleting `dist` alone without also deleting `tsconfig.tsbuildinfo` silently no-ops.
+
+## Dev vs. production database
+
+Dev and the published production deployment use separate databases — a dev-only data fix (`executeSql`, seed reruns, manual UPDATEs) never reaches prod, and vice versa.
+
+**Why:** confirmed by directly querying both; a stale-image-path data bug fixed in dev via SQL was still present in prod's database after the fix, since they don't share storage.
+
+**How to apply:** any one-off data repair (not just schema/code) needs either a permanent idempotent maintenance endpoint (safe to call once against prod after publish) or a manual prod SQL pass — a dev-side fix alone is not enough. Always verify by querying prod directly rather than assuming symmetry with dev.
+
+## Auth state must be read synchronously on mount, not in a `useEffect`
+
+`AuthProvider`'s token/role/name state must be initialized straight from `localStorage` in the `useState` initializer (`useState(() => localStorage.getItem(...))`), not read inside a `useEffect` that runs after the first render.
+
+**Why:** reading in a `useEffect` leaves `isAuthenticated` false for the very first render after every page load/hard refresh. Any layout/page that guards routes by checking `isAuthenticated` on mount (a pattern used per-page here instead of one shared `ProtectedRoute`) would see "logged out" for that first render and redirect to login — even though a valid token existed in storage the whole time. This presented as "refreshing the dashboard logs you out."
+
+**How to apply:** any new auth/session context in this codebase (or a similar per-page-guard pattern) must hydrate its initial state synchronously from storage, never lazily via an effect.

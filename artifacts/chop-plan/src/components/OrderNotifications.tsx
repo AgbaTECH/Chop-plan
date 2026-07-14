@@ -38,11 +38,13 @@ function orderParams(ref: OrderRef) {
 /** Read-only notification history thread, used on both the vendor and customer side. */
 export function NotificationHistory({ orderRef, viewer }: { orderRef: OrderRef; viewer: "vendor" | "user" }) {
   const params = orderParams(orderRef);
+  // Poll for new pickup notifications so a customer/vendor sees updates
+  // without needing to manually refresh the page.
   const vendorQuery = useListVendorOrderNotifications(params, {
-    query: { enabled: viewer === "vendor", queryKey: getListVendorOrderNotificationsQueryKey(params) },
+    query: { enabled: viewer === "vendor", queryKey: getListVendorOrderNotificationsQueryKey(params), refetchInterval: 15000 },
   });
   const userQuery = useListUserOrderNotifications(params, {
-    query: { enabled: viewer === "user", queryKey: getListUserOrderNotificationsQueryKey(params) },
+    query: { enabled: viewer === "user", queryKey: getListUserOrderNotificationsQueryKey(params), refetchInterval: 15000 },
   });
   const { data, isLoading } = viewer === "vendor" ? vendorQuery : userQuery;
 

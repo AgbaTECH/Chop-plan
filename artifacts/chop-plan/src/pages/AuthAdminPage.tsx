@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ShieldCheck } from "lucide-react";
 
@@ -80,7 +81,7 @@ export default function AuthAdminPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} data-testid="input-admin-password" />
+                      <PasswordInput placeholder="••••••••" {...field} data-testid="input-admin-password" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

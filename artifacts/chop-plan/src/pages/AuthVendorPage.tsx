@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
@@ -26,14 +27,20 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
-const signupSchema = loginSchema.extend({
-  ownerName: z.string().min(2),
-  businessName: z.string().min(2),
-  description: z.string().min(10),
-  area: z.string().min(2),
-  cuisineType: z.string().min(2),
-  phone: z.string().min(7),
-});
+const signupSchema = loginSchema
+  .extend({
+    ownerName: z.string().min(2),
+    businessName: z.string().min(2),
+    description: z.string().min(10),
+    area: z.string().min(2),
+    cuisineType: z.string().min(2),
+    phone: z.string().min(7),
+    confirmPassword: z.string().min(6),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 const codeSchema = z.object({
   code: z.string().min(6).max(6),
@@ -43,10 +50,16 @@ const forgotSchema = z.object({
   email: z.string().email(),
 });
 
-const resetSchema = z.object({
-  code: z.string().min(6).max(6),
-  newPassword: z.string().min(6),
-});
+const resetSchema = z
+  .object({
+    code: z.string().min(6).max(6),
+    newPassword: z.string().min(6),
+    confirmPassword: z.string().min(6),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 type Step = "form" | "verify" | "forgot" | "reset";
 
@@ -328,7 +341,20 @@ export default function AuthVendorPage() {
                     <FormItem>
                       <FormLabel>New password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <PasswordInput placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={resetForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm new password</FormLabel>
+                      <FormControl>
+                        <PasswordInput placeholder="••••••••" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -385,7 +411,7 @@ export default function AuthVendorPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <PasswordInput placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -445,7 +471,20 @@ export default function AuthVendorPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <PasswordInput placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signupForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                          <PasswordInput placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

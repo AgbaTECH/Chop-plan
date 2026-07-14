@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 type Role = 'user' | 'vendor' | 'admin' | null;
 
@@ -14,21 +14,16 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [role, setRole] = useState<Role>(null);
-  const [name, setName] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedToken = localStorage.getItem('chop_plan_token');
-    const storedRole = localStorage.getItem('chop_plan_role') as Role;
-    const storedName = localStorage.getItem('chop_plan_name');
-    
-    if (storedToken) {
-      setToken(storedToken);
-      setRole(storedRole);
-      if (storedName) setName(storedName);
-    }
-  }, []);
+  // Read straight from localStorage during the initial render (not in a
+  // useEffect) so `isAuthenticated` is correct on the very first render
+  // after a page refresh. Previously this state started as null/false and
+  // was only populated a tick later in an effect, which meant any guard
+  // that checked isAuthenticated on mount (e.g. VendorLayout, AdminLayout)
+  // would see "logged out" for one render and redirect to the login page,
+  // even though a valid token existed in storage the whole time.
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('chop_plan_token'));
+  const [role, setRole] = useState<Role>(() => (localStorage.getItem('chop_plan_role') as Role) ?? null);
+  const [name, setName] = useState<string | null>(() => localStorage.getItem('chop_plan_name'));
 
   const login = (newToken: string, newRole: Role, newName?: string) => {
     setToken(newToken);
