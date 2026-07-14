@@ -42,11 +42,13 @@ import type {
   MealInput,
   MealUpdate,
   PaymentStatus,
+  PaystackBank,
   PlanMealsResult,
   ResendOtpInput,
   ResetPasswordInput,
   ScheduleDay,
   SetPlanMealsInput,
+  SetVendorBankAccountInput,
   SignupResponse,
   SubscriptionPlan,
   SuccessResponse,
@@ -56,6 +58,7 @@ import type {
   UserSignupInput,
   UserSubscription,
   Vendor,
+  VendorBankAccount,
   VendorCustomer,
   VendorDashboard,
   VendorDetail,
@@ -3274,6 +3277,231 @@ export const useWithdrawFromWallet = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getWithdrawFromWalletMutationOptions(options));
+    }
+
+export const getListPaystackBanksUrl = () => {
+
+
+
+
+  return `/api/vendor/banks`
+}
+
+/**
+ * @summary List Nigerian banks available for payout account setup
+ */
+export const listPaystackBanks = async ( options?: RequestInit): Promise<PaystackBank[]> => {
+
+  return customFetch<PaystackBank[]>(getListPaystackBanksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPaystackBanksQueryKey = () => {
+    return [
+    `/api/vendor/banks`
+    ] as const;
+    }
+
+
+export const getListPaystackBanksQueryOptions = <TData = Awaited<ReturnType<typeof listPaystackBanks>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPaystackBanks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPaystackBanksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPaystackBanks>>> = ({ signal }) => listPaystackBanks({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPaystackBanks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPaystackBanksQueryResult = NonNullable<Awaited<ReturnType<typeof listPaystackBanks>>>
+export type ListPaystackBanksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List Nigerian banks available for payout account setup
+ */
+
+export function useListPaystackBanks<TData = Awaited<ReturnType<typeof listPaystackBanks>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPaystackBanks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPaystackBanksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVendorBankAccountUrl = () => {
+
+
+
+
+  return `/api/vendor/bank-account`
+}
+
+/**
+ * @summary Get the vendor's saved payout bank account, if any
+ */
+export const getVendorBankAccount = async ( options?: RequestInit): Promise<VendorBankAccount | null> => {
+
+  return customFetch<VendorBankAccount | null>(getGetVendorBankAccountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVendorBankAccountQueryKey = () => {
+    return [
+    `/api/vendor/bank-account`
+    ] as const;
+    }
+
+
+export const getGetVendorBankAccountQueryOptions = <TData = Awaited<ReturnType<typeof getVendorBankAccount>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorBankAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVendorBankAccountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVendorBankAccount>>> = ({ signal }) => getVendorBankAccount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVendorBankAccount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVendorBankAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getVendorBankAccount>>>
+export type GetVendorBankAccountQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the vendor's saved payout bank account, if any
+ */
+
+export function useGetVendorBankAccount<TData = Awaited<ReturnType<typeof getVendorBankAccount>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorBankAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVendorBankAccountQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetVendorBankAccountUrl = () => {
+
+
+
+
+  return `/api/vendor/bank-account`
+}
+
+/**
+ * @summary Add or replace the vendor's payout bank account, verifying it with Paystack
+ */
+export const setVendorBankAccount = async (setVendorBankAccountInput: SetVendorBankAccountInput, options?: RequestInit): Promise<VendorBankAccount> => {
+
+  return customFetch<VendorBankAccount>(getSetVendorBankAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setVendorBankAccountInput)
+  }
+);}
+
+
+
+
+
+export const getSetVendorBankAccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setVendorBankAccount>>, TError,{data: BodyType<SetVendorBankAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setVendorBankAccount>>, TError,{data: BodyType<SetVendorBankAccountInput>}, TContext> => {
+
+const mutationKey = ['setVendorBankAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setVendorBankAccount>>, {data: BodyType<SetVendorBankAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setVendorBankAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetVendorBankAccountMutationResult = NonNullable<Awaited<ReturnType<typeof setVendorBankAccount>>>
+    export type SetVendorBankAccountMutationBody = BodyType<SetVendorBankAccountInput>
+    export type SetVendorBankAccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add or replace the vendor's payout bank account, verifying it with Paystack
+ */
+export const useSetVendorBankAccount = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setVendorBankAccount>>, TError,{data: BodyType<SetVendorBankAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setVendorBankAccount>>,
+        TError,
+        {data: BodyType<SetVendorBankAccountInput>},
+        TContext
+      > => {
+      return useMutation(getSetVendorBankAccountMutationOptions(options));
     }
 
 export const getGetAdminStatsUrl = () => {

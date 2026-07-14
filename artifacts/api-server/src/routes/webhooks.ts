@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { db } from "@workspace/db";
-import { paymentsTable } from "@workspace/db";
+import { paymentsTable, vendorWithdrawalsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { verifyWebhookSignature } from "../lib/paystack";
 import { activatePaymentSuccess, markPaymentFailed } from "../lib/payment-activation";
@@ -33,18 +33,15 @@ export async function paystackWebhookHandler(req: Request, res: Response): Promi
     return;
   }
 
-  const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.reference, reference));
-  if (!payment) {
-    logger.warn({ reference }, "Paystack webhook referenced an unknown payment");
-    res.status(200).json({ success: true });
-    return;
-  }
-
   try {
-    if (event.event === "charge.success") {
-      await activatePaymentSuccess(payment);
-    } else if (event.event === "charge.failed") {
-      await markPaymentFailed(payment, event?.data?.gateway_response ?? "Payment failed");
+    if (event.event === "charge.success" || event.event === "charge.failed") {
+      await handleChargeEvent(event.event, reference, event?.data?.gateway_response);
+    } else if (
+      event.event === "transfer.success" ||
+      event.event === "transfer.failed" ||
+      event.event === "transfer.reversed"
+    ) {
+      await handleTransferEvent(event.event, reference, event?.data?.failure_reason ?? event?.data?.gateway_response);
     }
   } catch (err) {
     logger.error({ err, reference }, "Failed to process Paystack webhook event");
@@ -54,4 +51,42 @@ export async function paystackWebhookHandler(req: Request, res: Response): Promi
   }
 
   res.status(200).json({ success: true });
+}
+
+async function handleChargeEvent(event: string, reference: string, gatewayResponse: string | undefined): Promise<void> {
+  const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.reference, reference));
+  if (!payment) {
+    logger.warn({ reference }, "Paystack webhook referenced an unknown payment");
+    return;
+  }
+  if (event === "charge.success") {
+    await activatePaymentSuccess(payment);
+  } else {
+    await markPaymentFailed(payment, gatewayResponse ?? "Payment failed");
+  }
+}
+
+// Withdrawals are inserted "pending" at initiation time (see
+// POST /vendor/wallet/withdraw) and only ever move to a terminal state here,
+// once Paystack confirms the transfer's real-world outcome. A reversal
+// (funds bounced back after apparent success) is treated the same as a
+// failure so the vendor's balance is restored either way.
+async function handleTransferEvent(event: string, reference: string, failureReason: string | undefined): Promise<void> {
+  const [withdrawal] = await db.select().from(vendorWithdrawalsTable).where(eq(vendorWithdrawalsTable.reference, reference));
+  if (!withdrawal) {
+    logger.warn({ reference }, "Paystack webhook referenced an unknown withdrawal");
+    return;
+  }
+  if (withdrawal.status !== "pending") {
+    return; // already finalized (e.g. by the synchronous initiate response); don't downgrade
+  }
+  if (event === "transfer.success") {
+    await db.update(vendorWithdrawalsTable)
+      .set({ status: "success", updatedAt: new Date() })
+      .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+  } else {
+    await db.update(vendorWithdrawalsTable)
+      .set({ status: "failed", failureReason: failureReason ?? "Transfer failed", updatedAt: new Date() })
+      .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+  }
 }

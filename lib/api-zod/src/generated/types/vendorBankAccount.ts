@@ -5,16 +5,11 @@
  * Chop Plan API - prepaid lunch subscription service for Lagos restaurants
  * OpenAPI spec version: 0.1.0
  */
-import type { WalletWithdrawalStatus } from './walletWithdrawalStatus';
 
-export interface WalletWithdrawal {
-  id: number;
-  amountNaira: number;
-  status: WalletWithdrawalStatus;
+export interface VendorBankAccount {
+  bankCode: string;
   bankName: string;
   accountNumber: string;
   accountName: string;
-  /** @nullable */
-  failureReason: string | null;
-  createdAt: Date;
+  updatedAt: Date;
 }

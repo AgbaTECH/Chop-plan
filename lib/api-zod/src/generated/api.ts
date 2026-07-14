@@ -731,6 +731,11 @@ export const GetVendorWalletResponse = zod.object({
   "withdrawals": zod.array(zod.object({
   "id": zod.number(),
   "amountNaira": zod.number(),
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "accountName": zod.string(),
+  "failureReason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 }))
 })
@@ -753,8 +758,53 @@ export const WithdrawFromWalletResponse = zod.object({
   "withdrawals": zod.array(zod.object({
   "id": zod.number(),
   "amountNaira": zod.number(),
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "accountName": zod.string(),
+  "failureReason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 }))
+})
+
+
+/**
+ * @summary List Nigerian banks available for payout account setup
+ */
+export const ListPaystackBanksResponseItem = zod.object({
+  "name": zod.string(),
+  "code": zod.string()
+})
+export const ListPaystackBanksResponse = zod.array(ListPaystackBanksResponseItem)
+
+
+/**
+ * @summary Get the vendor's saved payout bank account, if any
+ */
+export const GetVendorBankAccountResponse = zod.union([zod.object({
+  "bankCode": zod.string(),
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "accountName": zod.string(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()])
+
+
+/**
+ * @summary Add or replace the vendor's payout bank account, verifying it with Paystack
+ */
+export const SetVendorBankAccountBody = zod.object({
+  "bankCode": zod.string(),
+  "bankName": zod.string(),
+  "accountNumber": zod.string()
+})
+
+export const SetVendorBankAccountResponse = zod.object({
+  "bankCode": zod.string(),
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "accountName": zod.string(),
+  "updatedAt": zod.coerce.date()
 })
 
 

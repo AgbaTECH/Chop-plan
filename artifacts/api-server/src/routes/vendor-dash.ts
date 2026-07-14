@@ -8,11 +8,15 @@ import {
   usersTable,
   subscriptionDaysTable,
   vendorWithdrawalsTable,
+  vendorBankAccountsTable,
   planMealsTable,
 } from "@workspace/db";
 import { eq, and, sql, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { perDayShareNaira } from "../lib/schedule";
+import { listBanks, resolveAccountNumber, createTransferRecipient, initiateTransfer, PaystackError } from "../lib/paystack";
+import { logger } from "../lib/logger";
+import crypto from "node:crypto";
 
 const router = Router();
 
@@ -340,13 +344,30 @@ async function getVendorWalletSummary(vendorId: number) {
     .where(eq(vendorWithdrawalsTable.vendorId, vendorId))
     .orderBy(desc(vendorWithdrawalsTable.createdAt));
 
-  const withdrawnNaira = withdrawals.reduce((sum, w) => sum + w.amountNaira, 0);
+  // Pending and successful withdrawals both hold funds against the balance;
+  // a failed transfer is excluded here, which is what "restores" the amount
+  // to the withdrawable balance — no separate refund step needed.
+  const reservedNaira = withdrawals
+    .filter((w) => w.status === "pending" || w.status === "success")
+    .reduce((sum, w) => sum + w.amountNaira, 0);
+  const withdrawnNaira = withdrawals
+    .filter((w) => w.status === "success")
+    .reduce((sum, w) => sum + w.amountNaira, 0);
 
   return {
     earnedNaira,
-    withdrawableNaira: earnedNaira - withdrawnNaira,
+    withdrawableNaira: earnedNaira - reservedNaira,
     withdrawnNaira,
-    withdrawals: withdrawals.map((w) => ({ id: w.id, amountNaira: w.amountNaira, createdAt: w.createdAt })),
+    withdrawals: withdrawals.map((w) => ({
+      id: w.id,
+      amountNaira: w.amountNaira,
+      status: w.status as "pending" | "success" | "failed",
+      bankName: w.bankName,
+      accountNumber: w.accountNumber,
+      accountName: w.accountName,
+      failureReason: w.failureReason,
+      createdAt: w.createdAt,
+    })),
   };
 }
 
@@ -355,7 +376,99 @@ router.get("/vendor/wallet", requireAuth("vendor"), async (req: AuthRequest, res
   res.json(await getVendorWalletSummary(req.session!.id));
 });
 
-// POST /vendor/wallet/withdraw
+// GET /vendor/banks — list of Nigerian banks for the payout-account form
+router.get("/vendor/banks", requireAuth("vendor"), async (_req: AuthRequest, res) => {
+  try {
+    const banks = await listBanks();
+    res.json(banks);
+  } catch (err) {
+    res.status(502).json({ error: err instanceof PaystackError ? err.message : "Failed to load bank list" });
+  }
+});
+
+// GET /vendor/bank-account — the vendor's saved payout account, if any
+router.get("/vendor/bank-account", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const [account] = await db
+    .select()
+    .from(vendorBankAccountsTable)
+    .where(eq(vendorBankAccountsTable.vendorId, req.session!.id));
+  if (!account) {
+    res.json(null);
+    return;
+  }
+  res.json({
+    bankCode: account.bankCode,
+    bankName: account.bankName,
+    accountNumber: account.accountNumber,
+    accountName: account.accountName,
+    updatedAt: account.updatedAt,
+  });
+});
+
+// POST /vendor/bank-account — resolves the account number with Paystack,
+// registers it as a transfer recipient, and saves/replaces the vendor's
+// single payout account. Must succeed before a withdrawal can be requested.
+router.post("/vendor/bank-account", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const { bankCode, bankName, accountNumber } = req.body ?? {};
+  if (!bankCode || !bankName || !accountNumber) {
+    res.status(400).json({ error: "bankCode, bankName and accountNumber are required" });
+    return;
+  }
+
+  let resolved;
+  try {
+    resolved = await resolveAccountNumber(String(accountNumber), String(bankCode));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof PaystackError ? err.message : "Could not verify this account number" });
+    return;
+  }
+
+  let recipientCode: string;
+  try {
+    recipientCode = await createTransferRecipient({
+      accountName: resolved.accountName,
+      accountNumber: resolved.accountNumber,
+      bankCode: String(bankCode),
+    });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof PaystackError ? err.message : "Failed to register payout account with Paystack" });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(vendorBankAccountsTable)
+    .where(eq(vendorBankAccountsTable.vendorId, vendorId));
+
+  const values = {
+    vendorId,
+    bankCode: String(bankCode),
+    bankName: String(bankName),
+    accountNumber: resolved.accountNumber,
+    accountName: resolved.accountName,
+    recipientCode,
+    updatedAt: new Date(),
+  };
+
+  const [account] = existing
+    ? await db.update(vendorBankAccountsTable).set(values).where(eq(vendorBankAccountsTable.vendorId, vendorId)).returning()
+    : await db.insert(vendorBankAccountsTable).values(values).returning();
+
+  res.status(existing ? 200 : 201).json({
+    bankCode: account.bankCode,
+    bankName: account.bankName,
+    accountNumber: account.accountNumber,
+    accountName: account.accountName,
+    updatedAt: account.updatedAt,
+  });
+});
+
+// POST /vendor/wallet/withdraw — initiates a real Paystack transfer to the
+// vendor's verified bank account. The withdrawal row is inserted "pending"
+// before the transfer call so the funds are reserved immediately (no
+// double-withdraw race), then flipped to "success"/"failed" based on
+// Paystack's response and, definitively, the transfer webhook.
 router.post("/vendor/wallet/withdraw", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
   const amountNaira = Number(req.body?.amountNaira);
@@ -363,12 +476,70 @@ router.post("/vendor/wallet/withdraw", requireAuth("vendor"), async (req: AuthRe
     res.status(400).json({ error: "Invalid withdrawal amount" });
     return;
   }
+
+  const [bankAccount] = await db
+    .select()
+    .from(vendorBankAccountsTable)
+    .where(eq(vendorBankAccountsTable.vendorId, vendorId));
+  if (!bankAccount) {
+    res.status(400).json({ error: "Add and verify a payout bank account before withdrawing" });
+    return;
+  }
+
   const summary = await getVendorWalletSummary(vendorId);
   if (amountNaira > summary.withdrawableNaira) {
     res.status(400).json({ error: "Amount exceeds withdrawable balance" });
     return;
   }
-  await db.insert(vendorWithdrawalsTable).values({ vendorId, amountNaira });
+
+  const reference = `chopplan_wd_${crypto.randomUUID()}`;
+  const [withdrawal] = await db
+    .insert(vendorWithdrawalsTable)
+    .values({
+      vendorId,
+      amountNaira,
+      reference,
+      status: "pending",
+      bankName: bankAccount.bankName,
+      accountNumber: bankAccount.accountNumber,
+      accountName: bankAccount.accountName,
+    })
+    .returning();
+
+  try {
+    const transfer = await initiateTransfer({
+      amountNaira,
+      recipientCode: bankAccount.recipientCode,
+      reference,
+      reason: "Chop Plan vendor withdrawal",
+    });
+
+    if (transfer.status === "success") {
+      await db.update(vendorWithdrawalsTable)
+        .set({ status: "success", transferCode: transfer.transferCode, updatedAt: new Date() })
+        .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+    } else if (transfer.status === "failed") {
+      await db.update(vendorWithdrawalsTable)
+        .set({ status: "failed", transferCode: transfer.transferCode, failureReason: "Transfer failed at Paystack", updatedAt: new Date() })
+        .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+    } else if (transfer.status === "otp") {
+      // OTP finalization can't be automated server-side; treat as failed so
+      // the balance is restored rather than left in limbo.
+      await db.update(vendorWithdrawalsTable)
+        .set({ status: "failed", transferCode: transfer.transferCode, failureReason: "This Paystack account requires OTP finalization for transfers. Disable OTP finalization in your Paystack dashboard settings to enable withdrawals.", updatedAt: new Date() })
+        .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+    } else {
+      await db.update(vendorWithdrawalsTable)
+        .set({ transferCode: transfer.transferCode, updatedAt: new Date() })
+        .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+    }
+  } catch (err) {
+    logger.error({ err, withdrawalId: withdrawal.id }, "Failed to initiate Paystack transfer");
+    await db.update(vendorWithdrawalsTable)
+      .set({ status: "failed", failureReason: err instanceof PaystackError ? err.message : "Failed to initiate transfer", updatedAt: new Date() })
+      .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
+  }
+
   res.json(await getVendorWalletSummary(vendorId));
 });
 

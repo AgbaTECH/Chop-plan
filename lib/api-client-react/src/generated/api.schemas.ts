@@ -354,9 +354,24 @@ export interface ScheduleDay {
   confirmedAt: string | null;
 }
 
+export type WalletWithdrawalStatus = typeof WalletWithdrawalStatus[keyof typeof WalletWithdrawalStatus];
+
+
+export const WalletWithdrawalStatus = {
+  pending: 'pending',
+  success: 'success',
+  failed: 'failed',
+} as const;
+
 export interface WalletWithdrawal {
   id: number;
   amountNaira: number;
+  status: WalletWithdrawalStatus;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  /** @nullable */
+  failureReason: string | null;
   createdAt: string;
 }
 
@@ -372,6 +387,25 @@ export interface VendorWallet {
 export interface WithdrawInput {
   /** @minimum 1 */
   amountNaira: number;
+}
+
+export interface PaystackBank {
+  name: string;
+  code: string;
+}
+
+export interface VendorBankAccount {
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  updatedAt: string;
+}
+
+export interface SetVendorBankAccountInput {
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
 }
 
 export interface AdminStats {

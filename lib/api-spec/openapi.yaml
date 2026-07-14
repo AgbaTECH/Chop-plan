@@ -1041,6 +1041,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /vendor/banks:
+    get:
+      operationId: listPaystackBanks
+      tags: [vendor]
+      summary: List Nigerian banks available for payout account setup
+      responses:
+        "200":
+          description: Bank list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaystackBank"
+
+  /vendor/bank-account:
+    get:
+      operationId: getVendorBankAccount
+      tags: [vendor]
+      summary: Get the vendor's saved payout bank account, if any
+      responses:
+        "200":
+          description: The vendor's bank account, or null if not set up yet
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: "#/components/schemas/VendorBankAccount"
+                  - type: "null"
+    post:
+      operationId: setVendorBankAccount
+      tags: [vendor]
+      summary: Add or replace the vendor's payout bank account, verifying it with Paystack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVendorBankAccountInput"
+      responses:
+        "200":
+          description: Bank account updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorBankAccount"
+        "201":
+          description: Bank account added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorBankAccount"
+        "400":
+          description: Could not verify the account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── ADMIN ────────────────────────────────────────────────────────────────
   /admin/stats:
     get:
@@ -1837,12 +1896,23 @@ components:
 
     WalletWithdrawal:
       type: object
-      required: [id, amountNaira, createdAt]
+      required: [id, amountNaira, status, bankName, accountNumber, accountName, failureReason, createdAt]
       properties:
         id:
           type: integer
         amountNaira:
           type: integer
+        status:
+          type: string
+          enum: [pending, success, failed]
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        accountName:
+          type: string
+        failureReason:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -1871,6 +1941,42 @@ components:
         amountNaira:
           type: integer
           minimum: 1
+
+    PaystackBank:
+      type: object
+      required: [name, code]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+
+    VendorBankAccount:
+      type: object
+      required: [bankCode, bankName, accountNumber, accountName, updatedAt]
+      properties:
+        bankCode:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        accountName:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    SetVendorBankAccountInput:
+      type: object
+      required: [bankCode, bankName, accountNumber]
+      properties:
+        bankCode:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
 
     # ── Admin ────────────────────────────────────────────────────────────────
     AdminStats:
