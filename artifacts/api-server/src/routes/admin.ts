@@ -85,7 +85,7 @@ router.post("/admin/vendors", requireAuth("admin"), async (req, res) => {
       businessName,
       ownerName,
       email,
-      passwordHash: hashPassword(password),
+      passwordHash: await hashPassword(password),
       phone,
       area,
       cuisineType,
@@ -151,7 +151,7 @@ router.post("/admin/customers", requireAuth("admin"), async (req, res) => {
   }
   const [user] = await db
     .insert(usersTable)
-    .values({ name, email, passwordHash: hashPassword(password), phone, area })
+    .values({ name, email, passwordHash: await hashPassword(password), phone, area })
     .returning();
 
   res.status(201).json({

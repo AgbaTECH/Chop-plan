@@ -19,7 +19,18 @@ import { perDayShareNaira, PREMIUM_DAYS_PER_MONTH, PREMIUM_FREE_DAYS } from "../
 import { listBanks, resolveAccountNumber, createTransferRecipient, initiateTransfer, PaystackError } from "../lib/paystack";
 import { logger } from "../lib/logger";
 import { PRESET_TYPES, PresetType, resolveNotificationMessage } from "../lib/notifications";
+import { withdrawalRateLimit } from "../lib/rate-limit";
 import crypto from "node:crypto";
+import {
+  UpdateVendorProfileBody,
+  UpsertBasicPlanBody,
+  UpsertPremiumPlanBody,
+  CreateMealBody,
+  UpdateMealBody,
+  SendVendorOrderNotificationBody,
+  SetVendorBankAccountBody,
+  WithdrawFromWalletBody,
+} from "@workspace/api-zod";
 
 const router = Router();
 
@@ -43,7 +54,12 @@ router.get("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, re
 
 // PATCH /vendor/profile
 router.patch("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, res) => {
-  const { businessName, ownerName, phone, area, cuisineType, description, coverImage, kitchenPhotos } = req.body;
+  const parsed = UpdateVendorProfileBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
+    return;
+  }
+  const { businessName, ownerName, phone, area, cuisineType, description, coverImage, kitchenPhotos } = parsed.data;
   const updates: Partial<typeof vendorsTable.$inferInsert> = {};
   if (businessName) updates.businessName = businessName;
   if (ownerName) updates.ownerName = ownerName;
@@ -52,13 +68,7 @@ router.patch("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, 
   if (cuisineType) updates.cuisineType = cuisineType;
   if (description !== undefined) updates.description = description;
   if (coverImage !== undefined) updates.coverImage = coverImage;
-  if (kitchenPhotos !== undefined) {
-    if (!Array.isArray(kitchenPhotos) || !kitchenPhotos.every((p) => typeof p === "string")) {
-      res.status(400).json({ error: "kitchenPhotos must be an array of strings" });
-      return;
-    }
-    updates.kitchenPhotos = kitchenPhotos;
-  }
+  if (kitchenPhotos !== undefined) updates.kitchenPhotos = kitchenPhotos;
   const [v] = await db.update(vendorsTable).set(updates).where(eq(vendorsTable.id, req.session!.id)).returning();
   res.json({
     id: v.id, businessName: v.businessName, ownerName: v.ownerName,
@@ -223,9 +233,14 @@ router.get("/vendor/plans", requireAuth("vendor"), async (req: AuthRequest, res)
 // fixed meal, no timetable, no rotation.
 router.put("/vendor/plans/basic", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const { priceNaira, daysPerMonth, freeDays, mealId } = req.body ?? {};
-  if (!priceNaira || priceNaira <= 0 || !daysPerMonth || daysPerMonth <= 0 || freeDays === undefined || freeDays < 0 || !mealId) {
-    res.status(400).json({ error: "priceNaira, daysPerMonth, freeDays and mealId are required" });
+  const parsed = UpsertBasicPlanBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
+    return;
+  }
+  const { priceNaira, daysPerMonth, freeDays, mealId } = parsed.data;
+  if (priceNaira <= 0 || daysPerMonth <= 0 || freeDays < 0) {
+    res.status(400).json({ error: "priceNaira and daysPerMonth must be positive, and freeDays cannot be negative" });
     return;
   }
 
@@ -255,27 +270,23 @@ router.put("/vendor/plans/basic", requireAuth("vendor"), async (req: AuthRequest
 // free day whose meal is distinct from every rotation meal.
 router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const { priceNaira, rotation, freeDay } = req.body ?? {};
-
-  if (!priceNaira || priceNaira <= 0) {
-    res.status(400).json({ error: "priceNaira is required" });
+  const parsed = UpsertPremiumPlanBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
     return;
   }
-  if (!Array.isArray(rotation) || rotation.length !== 4) {
+  const { priceNaira, rotation, freeDay } = parsed.data;
+
+  if (priceNaira <= 0) {
+    res.status(400).json({ error: "priceNaira must be positive" });
+    return;
+  }
+  if (rotation.length !== 4) {
     res.status(400).json({ error: "Premium requires exactly 4 rotation days" });
     return;
   }
-  const validEntry = (e: any) => e && typeof e.dayOfWeek === "number" && e.dayOfWeek >= 0 && e.dayOfWeek <= 6 && typeof e.mealId === "number";
-  if (!freeDay || !validEntry(freeDay)) {
-    res.status(400).json({ error: "Premium requires exactly 1 free day with a valid dayOfWeek (0-6) and mealId" });
-    return;
-  }
-  if (!rotation.every(validEntry)) {
-    res.status(400).json({ error: "Each rotation day needs a valid dayOfWeek (0-6) and mealId" });
-    return;
-  }
 
-  const rotationDays = rotation.map((e: any) => e.dayOfWeek);
+  const rotationDays = rotation.map((e) => e.dayOfWeek);
   if (new Set(rotationDays).size !== 4) {
     res.status(400).json({ error: "Rotation days must be 4 distinct days of the week" });
     return;
@@ -284,7 +295,7 @@ router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthReque
     res.status(400).json({ error: "The free day must be a different day from the 4 rotation days" });
     return;
   }
-  const rotationMealIds = rotation.map((e: any) => e.mealId);
+  const rotationMealIds = rotation.map((e) => e.mealId);
   if (rotationMealIds.includes(freeDay.mealId)) {
     res.status(400).json({ error: "The free-day meal must be different from all 4 rotation meals" });
     return;
@@ -334,7 +345,7 @@ router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthReque
 
       await tx.delete(planTimetableTable).where(eq(planTimetableTable.planId, savedPlan.id));
       const inserted = await tx.insert(planTimetableTable).values([
-        ...rotation.map((e: any) => ({ planId: savedPlan.id, dayOfWeek: e.dayOfWeek, mealId: e.mealId, isFreeDay: false })),
+        ...rotation.map((e) => ({ planId: savedPlan.id, dayOfWeek: e.dayOfWeek, mealId: e.mealId, isFreeDay: false })),
         { planId: savedPlan.id, dayOfWeek: freeDay.dayOfWeek, mealId: freeDay.mealId, isFreeDay: true },
       ]).returning();
 
@@ -403,7 +414,12 @@ router.get("/vendor/meals", requireAuth("vendor"), async (req: AuthRequest, res)
 
 // POST /vendor/meals
 router.post("/vendor/meals", requireAuth("vendor"), async (req: AuthRequest, res) => {
-  const { name, description, priceNaira, imageUrl, category, available } = req.body;
+  const parsed = CreateMealBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
+    return;
+  }
+  const { name, description, priceNaira, imageUrl, category, available } = parsed.data;
   const [meal] = await db
     .insert(mealsTable)
     .values({
@@ -421,7 +437,12 @@ router.post("/vendor/meals", requireAuth("vendor"), async (req: AuthRequest, res
 // PATCH /vendor/meals/:mealId
 router.patch("/vendor/meals/:mealId", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const mealId = Number(req.params.mealId);
-  const { name, description, priceNaira, imageUrl, category, available } = req.body;
+  const parsed = UpdateMealBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
+    return;
+  }
+  const { name, description, priceNaira, imageUrl, category, available } = parsed.data;
   const updates: Partial<typeof mealsTable.$inferInsert> = {};
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
@@ -597,13 +618,14 @@ async function resolveVendorOrder(
 // about one of the vendor's own orders (subscription day or à la carte).
 router.post("/vendor/notifications", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const { orderType, subscriptionDayId, paymentId, presetType, message } = req.body ?? {};
-
-  if (orderType !== "subscription" && orderType !== "alacarte") {
-    res.status(400).json({ error: "orderType must be 'subscription' or 'alacarte'" });
+  const parsed = SendVendorOrderNotificationBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
     return;
   }
-  if (typeof presetType !== "string" || !PRESET_TYPES.includes(presetType as PresetType)) {
+  const { orderType, subscriptionDayId, paymentId, presetType, message } = parsed.data;
+
+  if (!PRESET_TYPES.includes(presetType as PresetType)) {
     res.status(400).json({ error: `presetType must be one of: ${PRESET_TYPES.join(", ")}` });
     return;
   }
@@ -797,11 +819,12 @@ router.get("/vendor/bank-account", requireAuth("vendor"), async (req: AuthReques
 // single payout account. Must succeed before a withdrawal can be requested.
 router.post("/vendor/bank-account", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const { bankCode, bankName, accountNumber } = req.body ?? {};
-  if (!bankCode || !bankName || !accountNumber) {
-    res.status(400).json({ error: "bankCode, bankName and accountNumber are required" });
+  const parsed = SetVendorBankAccountBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
     return;
   }
+  const { bankCode, bankName, accountNumber } = parsed.data;
 
   let resolved;
   try {
@@ -856,13 +879,14 @@ router.post("/vendor/bank-account", requireAuth("vendor"), async (req: AuthReque
 // before the transfer call so the funds are reserved immediately (no
 // double-withdraw race), then flipped to "success"/"failed" based on
 // Paystack's response and, definitively, the transfer webhook.
-router.post("/vendor/wallet/withdraw", requireAuth("vendor"), async (req: AuthRequest, res) => {
+router.post("/vendor/wallet/withdraw", requireAuth("vendor"), withdrawalRateLimit, async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const amountNaira = Number(req.body?.amountNaira);
-  if (!amountNaira || amountNaira <= 0) {
+  const parsed = WithdrawFromWalletBody.safeParse(req.body);
+  if (!parsed.success) {
     res.status(400).json({ error: "Invalid withdrawal amount" });
     return;
   }
+  const { amountNaira } = parsed.data;
 
   const [bankAccount] = await db
     .select()

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, vendorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { createSession, deleteSession, deleteSessionsForOwner, hashPassword, verifyPassword } from "../lib/sessions";
+import { createSession, deleteSession, deleteSessionsForOwner, hashPassword, verifyAndMaybeUpgradePassword } from "../lib/sessions";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import {
   UserSignupBody,
@@ -23,6 +23,7 @@ import { adminsTable } from "@workspace/db";
 import { createVerificationCode, verifyAndConsumeCode, verifyErrorMessage, RateLimitError } from "../lib/otp";
 import { sendEmail, otpEmailHtml } from "../lib/email";
 import { logger } from "../lib/logger";
+import { loginRateLimit, signupRateLimit, otpRequestRateLimit, otpVerifyRateLimit } from "../lib/rate-limit";
 
 const router = Router();
 
@@ -119,14 +120,14 @@ async function handleResetPassword(role: AccountRole, email: string, code: strin
   if (!result.ok) {
     return { status: 400 as const, body: { error: verifyErrorMessage(result.reason) } };
   }
-  await db.update(table).set({ passwordHash: hashPassword(newPassword) }).where(eq(table.id, account.id));
+  await db.update(table).set({ passwordHash: await hashPassword(newPassword) }).where(eq(table.id, account.id));
   deleteSessionsForOwner(role, account.id);
   return { status: 200 as const, body: { success: true, message: "Password reset successful" } };
 }
 
 // ── User ─────────────────────────────────────────────────────────────────
 
-router.post("/auth/user/signup", async (req, res) => {
+router.post("/auth/user/signup", signupRateLimit, async (req, res) => {
   const parsed = UserSignupBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -141,7 +142,7 @@ router.post("/auth/user/signup", async (req, res) => {
   const [user] = await db.insert(usersTable).values({
     name,
     email,
-    passwordHash: hashPassword(password),
+    passwordHash: await hashPassword(password),
     phone,
     area,
   }).returning();
@@ -156,7 +157,7 @@ router.post("/auth/user/signup", async (req, res) => {
   res.status(201).json({ requiresVerification: true, email: user.email, message: "We sent a verification code to your email" });
 });
 
-router.post("/auth/user/login", async (req, res) => {
+router.post("/auth/user/login", loginRateLimit, async (req, res) => {
   const parsed = UserLoginBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -164,9 +165,17 @@ router.post("/auth/user/login", async (req, res) => {
   }
   const { email, password } = parsed.data;
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (!user) {
     res.status(401).json({ error: "Invalid email or password" });
     return;
+  }
+  const check = await verifyAndMaybeUpgradePassword(password, user.passwordHash);
+  if (!check.valid) {
+    res.status(401).json({ error: "Invalid email or password" });
+    return;
+  }
+  if (check.upgradedHash) {
+    await db.update(usersTable).set({ passwordHash: check.upgradedHash }).where(eq(usersTable.id, user.id));
   }
   if (!user.verified) {
     res.status(403).json({ error: "Account not verified", requiresVerification: true, email: user.email });
@@ -176,7 +185,7 @@ router.post("/auth/user/login", async (req, res) => {
   res.json({ token, role: "user", id: user.id, name: user.name, email: user.email });
 });
 
-router.post("/auth/user/verify", async (req, res) => {
+router.post("/auth/user/verify", otpVerifyRateLimit, async (req, res) => {
   const parsed = UserVerifyBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -187,7 +196,7 @@ router.post("/auth/user/verify", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-router.post("/auth/user/resend-otp", async (req, res) => {
+router.post("/auth/user/resend-otp", otpRequestRateLimit, async (req, res) => {
   const parsed = UserResendOtpBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -197,7 +206,7 @@ router.post("/auth/user/resend-otp", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-router.post("/auth/user/forgot-password", async (req, res) => {
+router.post("/auth/user/forgot-password", otpRequestRateLimit, async (req, res) => {
   const parsed = UserForgotPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -207,7 +216,7 @@ router.post("/auth/user/forgot-password", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-router.post("/auth/user/reset-password", async (req, res) => {
+router.post("/auth/user/reset-password", otpVerifyRateLimit, async (req, res) => {
   const parsed = UserResetPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -220,7 +229,7 @@ router.post("/auth/user/reset-password", async (req, res) => {
 
 // ── Vendor ───────────────────────────────────────────────────────────────
 
-router.post("/auth/vendor/signup", async (req, res) => {
+router.post("/auth/vendor/signup", signupRateLimit, async (req, res) => {
   const parsed = VendorSignupBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -236,7 +245,7 @@ router.post("/auth/vendor/signup", async (req, res) => {
     businessName,
     ownerName,
     email,
-    passwordHash: hashPassword(password),
+    passwordHash: await hashPassword(password),
     phone,
     area,
     cuisineType,
@@ -255,7 +264,7 @@ router.post("/auth/vendor/signup", async (req, res) => {
   res.status(201).json({ requiresVerification: true, email: vendor.email, message: "We sent a verification code to your email" });
 });
 
-router.post("/auth/vendor/login", async (req, res) => {
+router.post("/auth/vendor/login", loginRateLimit, async (req, res) => {
   const parsed = VendorLoginBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -263,9 +272,17 @@ router.post("/auth/vendor/login", async (req, res) => {
   }
   const { email, password } = parsed.data;
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.email, email)).limit(1);
-  if (!vendor || !verifyPassword(password, vendor.passwordHash)) {
+  if (!vendor) {
     res.status(401).json({ error: "Invalid email or password" });
     return;
+  }
+  const check = await verifyAndMaybeUpgradePassword(password, vendor.passwordHash);
+  if (!check.valid) {
+    res.status(401).json({ error: "Invalid email or password" });
+    return;
+  }
+  if (check.upgradedHash) {
+    await db.update(vendorsTable).set({ passwordHash: check.upgradedHash }).where(eq(vendorsTable.id, vendor.id));
   }
   if (!vendor.verified) {
     res.status(403).json({ error: "Account not verified", requiresVerification: true, email: vendor.email });
@@ -275,7 +292,7 @@ router.post("/auth/vendor/login", async (req, res) => {
   res.json({ token, role: "vendor", id: vendor.id, name: vendor.businessName, email: vendor.email });
 });
 
-router.post("/auth/vendor/verify", async (req, res) => {
+router.post("/auth/vendor/verify", otpVerifyRateLimit, async (req, res) => {
   const parsed = VendorVerifyBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -286,7 +303,7 @@ router.post("/auth/vendor/verify", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-router.post("/auth/vendor/resend-otp", async (req, res) => {
+router.post("/auth/vendor/resend-otp", otpRequestRateLimit, async (req, res) => {
   const parsed = VendorResendOtpBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -296,7 +313,7 @@ router.post("/auth/vendor/resend-otp", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-router.post("/auth/vendor/forgot-password", async (req, res) => {
+router.post("/auth/vendor/forgot-password", otpRequestRateLimit, async (req, res) => {
   const parsed = VendorForgotPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -306,7 +323,7 @@ router.post("/auth/vendor/forgot-password", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-router.post("/auth/vendor/reset-password", async (req, res) => {
+router.post("/auth/vendor/reset-password", otpVerifyRateLimit, async (req, res) => {
   const parsed = VendorResetPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -319,7 +336,7 @@ router.post("/auth/vendor/reset-password", async (req, res) => {
 
 // ── Admin (unchanged) ────────────────────────────────────────────────────
 
-router.post("/auth/admin/login", async (req, res) => {
+router.post("/auth/admin/login", loginRateLimit, async (req, res) => {
   const parsed = AdminLoginBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed" });
@@ -327,9 +344,17 @@ router.post("/auth/admin/login", async (req, res) => {
   }
   const { email, password } = parsed.data;
   const [admin] = await db.select().from(adminsTable).where(eq(adminsTable.email, email)).limit(1);
-  if (!admin || !verifyPassword(password, admin.passwordHash)) {
+  if (!admin) {
     res.status(401).json({ error: "Invalid email or password" });
     return;
+  }
+  const check = await verifyAndMaybeUpgradePassword(password, admin.passwordHash);
+  if (!check.valid) {
+    res.status(401).json({ error: "Invalid email or password" });
+    return;
+  }
+  if (check.upgradedHash) {
+    await db.update(adminsTable).set({ passwordHash: check.upgradedHash }).where(eq(adminsTable.id, admin.id));
   }
   const token = createSession({ id: admin.id, role: "admin", name: admin.name, email: admin.email });
   res.json({ token, role: "admin", id: admin.id, name: admin.name, email: admin.email });

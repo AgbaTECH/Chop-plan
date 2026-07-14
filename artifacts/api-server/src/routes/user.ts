@@ -17,6 +17,7 @@ import { totalScheduleDays } from "../lib/schedule";
 import { toCustomerDisplayPriceNaira, computeOffSchedulePricing } from "../lib/pricing";
 import { initializeTransaction, verifyTransaction, PaystackError } from "../lib/paystack";
 import { activatePaymentSuccess, markPaymentFailed } from "../lib/payment-activation";
+import { UpdateUserProfileBody, CheckoutSubscriptionBody, CheckoutAlacarteBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -29,7 +30,12 @@ router.get("/user/profile", requireAuth("user"), async (req: AuthRequest, res) =
 
 // PATCH /user/profile
 router.patch("/user/profile", requireAuth("user"), async (req: AuthRequest, res) => {
-  const { name, phone, area } = req.body;
+  const parsed = UpdateUserProfileBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
+    return;
+  }
+  const { name, phone, area } = parsed.data;
   const updates: Partial<typeof usersTable.$inferInsert> = {};
   if (name) updates.name = name;
   if (phone) updates.phone = phone;
@@ -81,15 +87,12 @@ router.get("/user/subscriptions", requireAuth("user"), async (req: AuthRequest, 
 // the charge succeeded (see activatePaymentSuccess, invoked from the webhook
 // or the verify endpoint below).
 router.post("/user/subscriptions/checkout", requireAuth("user"), async (req: AuthRequest, res) => {
-  const { vendorId, planId, callbackUrl } = req.body;
-  if (!vendorId || !planId) {
-    res.status(400).json({ error: "vendorId and planId required" });
+  const parsed = CheckoutSubscriptionBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
     return;
   }
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    res.status(400).json({ error: "callbackUrl required" });
-    return;
-  }
+  const { vendorId, planId, callbackUrl } = parsed.data;
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session!.id));
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
@@ -180,15 +183,12 @@ router.get("/user/payments/:reference/verify", requireAuth("user"), async (req: 
 // can only ever be used for a right-now purchase, not to game future/past
 // subscription-day pricing.
 router.post("/user/alacarte/checkout", requireAuth("user"), async (req: AuthRequest, res) => {
-  const { vendorId, mealId, callbackUrl } = req.body;
-  if (!vendorId || !mealId) {
-    res.status(400).json({ error: "vendorId and mealId required" });
+  const parsed = CheckoutAlacarteBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed" });
     return;
   }
-  if (!callbackUrl || typeof callbackUrl !== "string") {
-    res.status(400).json({ error: "callbackUrl required" });
-    return;
-  }
+  const { vendorId, mealId, callbackUrl } = parsed.data;
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session!.id));
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));

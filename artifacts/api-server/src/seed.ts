@@ -4,15 +4,11 @@ import {
   mealsTable, subscriptionsTable, blogPostsTable,
   adminsTable, subscriptionDaysTable, planTimetableTable,
 } from "@workspace/db";
-import { createHash } from "crypto";
 import {
   totalScheduleDays, buildBasicScheduleRows, buildPremiumScheduleRows,
   PREMIUM_DAYS_PER_MONTH, PREMIUM_FREE_DAYS,
 } from "./lib/schedule";
-
-function hashPassword(password: string): string {
-  return createHash("sha256").update(password + "chop_plan_salt").digest("hex");
-}
+import { hashPassword } from "./lib/sessions";
 
 const BASE = "/chop-plan/images";
 
@@ -23,21 +19,21 @@ async function seed() {
   const [user1] = await db.insert(usersTable).values({
     name: "Amara Okafor",
     email: "amara@example.com",
-    passwordHash: hashPassword("password123"),
+    passwordHash: await hashPassword("password123"),
     phone: "08012345678",
     area: "Lekki",
   }).returning();
   const [user2] = await db.insert(usersTable).values({
     name: "Chidi Nwosu",
     email: "chidi@example.com",
-    passwordHash: hashPassword("password123"),
+    passwordHash: await hashPassword("password123"),
     phone: "08087654321",
     area: "Victoria Island",
   }).returning();
   const [user3] = await db.insert(usersTable).values({
     name: "Fatima Bello",
     email: "fatima@example.com",
-    passwordHash: hashPassword("password123"),
+    passwordHash: await hashPassword("password123"),
     phone: "08055566677",
     area: "Ikeja",
   }).returning();
@@ -47,7 +43,7 @@ async function seed() {
     businessName: "Mama Nkechi's Kitchen",
     ownerName: "Nkechi Obi",
     email: "nkechi@mamakitchen.ng",
-    passwordHash: hashPassword("vendor123"),
+    passwordHash: await hashPassword("vendor123"),
     phone: "08011122233",
     area: "Lekki",
     cuisineType: "Nigerian Home Cooking",
@@ -60,7 +56,7 @@ async function seed() {
     businessName: "VI Eats",
     ownerName: "Tunde Adeyemi",
     email: "tunde@vieats.ng",
-    passwordHash: hashPassword("vendor123"),
+    passwordHash: await hashPassword("vendor123"),
     phone: "08022233344",
     area: "Victoria Island",
     cuisineType: "Continental & Nigerian Fusion",
@@ -73,7 +69,7 @@ async function seed() {
     businessName: "Ikeja Buka Express",
     ownerName: "Segun Adeola",
     email: "segun@ikejabukaexpress.ng",
-    passwordHash: hashPassword("vendor123"),
+    passwordHash: await hashPassword("vendor123"),
     phone: "08033344455",
     area: "Ikeja",
     cuisineType: "Traditional Buka",
@@ -86,7 +82,7 @@ async function seed() {
     businessName: "Surulere Bowl & Grill",
     ownerName: "Chioma Eze",
     email: "chioma@surulerebowl.ng",
-    passwordHash: hashPassword("vendor123"),
+    passwordHash: await hashPassword("vendor123"),
     phone: "08044455566",
     area: "Surulere",
     cuisineType: "Grills & Rice Bowls",
@@ -214,10 +210,10 @@ async function seed() {
   await db.insert(adminsTable).values({
     name: "Adebayo Olanrewaju",
     email: "adebayoolanrewaju970@gmail.com",
-    passwordHash: hashPassword(adminPassword),
+    passwordHash: await hashPassword(adminPassword),
   }).onConflictDoUpdate({
     target: adminsTable.email,
-    set: { passwordHash: hashPassword(adminPassword) },
+    set: { passwordHash: await hashPassword(adminPassword) },
   });
 
   // -- Blog Posts --

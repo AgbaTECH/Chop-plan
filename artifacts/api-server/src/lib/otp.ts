@@ -1,4 +1,5 @@
-import { randomInt, createHash } from "crypto";
+import { randomInt, createHash, timingSafeEqual } from "crypto";
+import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { verificationCodesTable } from "@workspace/db";
 import { and, eq, desc, isNull } from "drizzle-orm";
@@ -8,6 +9,7 @@ export type VerificationPurpose = "signup_verify" | "password_reset";
 
 const CODE_TTL_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 60;
+const BCRYPT_ROUNDS = 10; // codes are short-lived (10 min) and low-throughput, so a lighter cost factor is fine
 
 export class RateLimitError extends Error {
   constructor(public retryAfterSeconds: number) {
@@ -15,8 +17,27 @@ export class RateLimitError extends Error {
   }
 }
 
-function hashCode(code: string): string {
+async function hashCode(code: string): Promise<string> {
+  return bcrypt.hash(code, BCRYPT_ROUNDS);
+}
+
+// Legacy format from before the bcrypt migration: SHA-256 of
+// `code + hardcoded salt`, always a 64-char hex string.
+function legacyHashCode(code: string): string {
   return createHash("sha256").update(code + "chop_plan_otp_salt").digest("hex");
+}
+
+function isLegacyHash(hash: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(hash);
+}
+
+async function codeMatchesHash(code: string, hash: string): Promise<boolean> {
+  if (isLegacyHash(hash)) {
+    const candidate = Buffer.from(legacyHashCode(code));
+    const stored = Buffer.from(hash);
+    return candidate.length === stored.length && timingSafeEqual(candidate, stored);
+  }
+  return bcrypt.compare(code, hash);
 }
 
 function generateCode(): string {
@@ -55,7 +76,7 @@ export async function createVerificationCode(
     role,
     ownerId,
     purpose,
-    codeHash: hashCode(code),
+    codeHash: await hashCode(code),
     expiresAt: new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000),
   });
   return code;
@@ -95,7 +116,7 @@ export async function verifyAndConsumeCode(
     if (latest.expiresAt.getTime() < Date.now()) {
       return { ok: false, reason: "expired" };
     }
-    if (latest.codeHash !== hashCode(submittedCode)) {
+    if (!(await codeMatchesHash(submittedCode, latest.codeHash))) {
       return { ok: false, reason: "incorrect" };
     }
 

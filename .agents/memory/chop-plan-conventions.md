@@ -49,6 +49,18 @@ This app has its own custom Bearer-token session auth (`requireAuth("vendor")`),
 
 Also: seeded demo vendor accounts here have `verified=false`, which blocks login — any DB-side testing of a vendor flow needs a temporary `UPDATE vendors SET verified = true` (and revert after) to log in as one. Same applies to demo user/customer accounts.
 
+## Security hardening (passwords/OTPs, CORS, rate limits)
+
+Password and OTP hashing migrated from SHA-256+hardcoded-salt to bcrypt (bcryptjs), with legacy-hash detection (64-char hex vs. bcrypt's `$2` prefix) so old accounts keep working and get transparently rehashed to bcrypt on next successful login — no forced password reset.
+
+**Why:** avoids a disruptive mass password reset while still closing the weak-hashing gap; legacy and bcrypt hash formats never collide so detection is unambiguous.
+
+**How to apply:** any new place that creates or checks a password/OTP hash must go through the shared helpers in `sessions.ts`/`otp.ts` (`hashPassword`, `verifyAndMaybeUpgradePassword`, the otp equivalents) rather than hashing inline — this includes seed scripts (`seed.ts` imports the same `hashPassword`).
+
+CORS is an allowlist (Replit dev/prod domains from `REPLIT_DOMAINS`/`REPLIT_DEV_DOMAIN`, plus localhost in dev) instead of a wildcard, since the web app and API share an origin via path-based proxy routing and never need arbitrary cross-origin browser access. A JSON-returning error handler was added in `app.ts` so a rejected CORS origin (or any other unhandled error) gets a clean 403/500 instead of Express's default HTML page with a leaked stack trace/file paths.
+
+Login/signup/OTP-request/OTP-verify/withdrawal endpoints have IP-based rate limits (`lib/rate-limit.ts`, via `express-rate-limit`) as a coarse first line of defense against brute-forcing passwords or the 6-digit OTP codes.
+
 ## Rebuilding `lib/db`'s dist after a schema change
 
 When `artifacts/api-server` typecheck fails with `TS6305: Output file '.../lib/db/dist/index.d.ts' has not been built from source file` right after editing `lib/db/src/schema/*`, deleting and rebuilding just `dist/` is not enough.
