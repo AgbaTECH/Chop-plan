@@ -7,12 +7,13 @@ import {
   vendorsTable,
   subscriptionPlansTable,
   subscriptionDaysTable,
+  mealsTable,
   paymentsTable,
 } from "@workspace/db";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
-import { totalScheduleDays, buildScheduleRows } from "../lib/schedule";
-import { toCustomerDisplayPriceNaira } from "../lib/pricing";
+import { totalScheduleDays } from "../lib/schedule";
+import { toCustomerDisplayPriceNaira, computeOffSchedulePricing } from "../lib/pricing";
 import { initializeTransaction, verifyTransaction, PaystackError } from "../lib/paystack";
 import { activatePaymentSuccess, markPaymentFailed } from "../lib/payment-activation";
 
@@ -47,7 +48,7 @@ router.get("/user/subscriptions", requireAuth("user"), async (req: AuthRequest, 
       status: subscriptionsTable.status,
       vendorName: vendorsTable.businessName,
       vendorCoverImage: vendorsTable.coverImage,
-      planName: subscriptionPlansTable.name,
+      tier: subscriptionPlansTable.tier,
       daysPerMonth: subscriptionPlansTable.daysPerMonth,
       freeDays: subscriptionPlansTable.freeDays,
       priceNaira: subscriptionPlansTable.priceNaira,
@@ -63,7 +64,7 @@ router.get("/user/subscriptions", requireAuth("user"), async (req: AuthRequest, 
       vendorId: s.vendorId,
       vendorName: s.vendorName,
       vendorCoverImage: s.vendorCoverImage ?? null,
-      planName: s.planName,
+      planName: s.tier === "basic" ? "Basic" : "Premium",
       daysPerMonth: s.daysPerMonth,
       freeDays: s.freeDays,
       priceNaira: toCustomerDisplayPriceNaira(s.priceNaira),
@@ -115,7 +116,7 @@ router.post("/user/subscriptions/checkout", requireAuth("user"), async (req: Aut
       amountNaira,
       reference: payment.reference,
       callbackUrl,
-      metadata: { userId: user.id, vendorId, planId, planName: plan.name },
+      metadata: { userId: user.id, vendorId, planId, planName: plan.tier === "basic" ? "Basic" : "Premium" },
     });
     res.status(201).json({
       reference: payment.reference,
@@ -145,11 +146,11 @@ router.get("/user/payments/:reference/verify", requireAuth("user"), async (req: 
   }
 
   if (payment.status === "success") {
-    res.json({ status: "success", subscriptionId: payment.subscriptionId, message: null });
+    res.json({ status: "success", subscriptionId: payment.subscriptionId, orderType: payment.orderType, paymentId: payment.id, message: null });
     return;
   }
   if (payment.status === "failed") {
-    res.json({ status: "failed", subscriptionId: null, message: payment.failureReason ?? "Payment failed" });
+    res.json({ status: "failed", subscriptionId: null, orderType: payment.orderType, paymentId: payment.id, message: payment.failureReason ?? "Payment failed" });
     return;
   }
 
@@ -157,17 +158,190 @@ router.get("/user/payments/:reference/verify", requireAuth("user"), async (req: 
     const result = await verifyTransaction(reference);
     if (result.status === "success") {
       const { subscriptionId } = await activatePaymentSuccess(payment);
-      res.json({ status: "success", subscriptionId, message: null });
+      res.json({ status: "success", subscriptionId, orderType: payment.orderType, paymentId: payment.id, message: null });
     } else if (result.status === "failed" || result.status === "abandoned") {
       const message = result.gatewayResponse || "Payment was declined or abandoned";
       await markPaymentFailed(payment, message);
-      res.json({ status: "failed", subscriptionId: null, message });
+      res.json({ status: "failed", subscriptionId: null, orderType: payment.orderType, paymentId: payment.id, message });
     } else {
-      res.json({ status: "pending", subscriptionId: null, message: null });
+      res.json({ status: "pending", subscriptionId: null, orderType: payment.orderType, paymentId: payment.id, message: null });
     }
   } catch (err) {
     res.status(502).json({ error: err instanceof PaystackError ? err.message : "Failed to verify payment with Paystack" });
   }
+});
+
+// POST /user/alacarte/checkout
+// Off-schedule, à la carte purchase: no active subscription required. Always
+// priced from the meal's raw vendor price using the (higher) off-schedule
+// markup rate — never trust a client-supplied price. orderDate is always
+// "today" (server clock), decided here, not by the client, so this endpoint
+// can only ever be used for a right-now purchase, not to game future/past
+// subscription-day pricing.
+router.post("/user/alacarte/checkout", requireAuth("user"), async (req: AuthRequest, res) => {
+  const { vendorId, mealId, callbackUrl } = req.body;
+  if (!vendorId || !mealId) {
+    res.status(400).json({ error: "vendorId and mealId required" });
+    return;
+  }
+  if (!callbackUrl || typeof callbackUrl !== "string") {
+    res.status(400).json({ error: "callbackUrl required" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session!.id));
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
+  const [meal] = await db.select().from(mealsTable).where(eq(mealsTable.id, mealId));
+  if (!user || !vendor || !meal) {
+    res.status(404).json({ error: "Vendor or meal not found" });
+    return;
+  }
+  if (meal.vendorId !== vendor.id) {
+    res.status(400).json({ error: "This meal does not belong to the selected vendor" });
+    return;
+  }
+  if (!meal.available) {
+    res.status(400).json({ error: "This meal is not currently available" });
+    return;
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+
+  // Off-schedule enforcement: if the customer already has an active
+  // subscription at this exact vendor with a pickup scheduled for today,
+  // today is an on-schedule day for them at this vendor — à la carte is for
+  // days outside the plan schedule, so block it here rather than only in
+  // the UI (this is checked server-side regardless of what the client sends).
+  const [scheduledToday] = await db
+    .select({ id: subscriptionDaysTable.id })
+    .from(subscriptionDaysTable)
+    .innerJoin(subscriptionsTable, eq(subscriptionDaysTable.subscriptionId, subscriptionsTable.id))
+    .where(
+      and(
+        eq(subscriptionsTable.userId, user.id),
+        eq(subscriptionsTable.vendorId, vendor.id),
+        eq(subscriptionsTable.status, "active"),
+        eq(subscriptionDaysTable.scheduledDate, today)
+      )
+    )
+    .limit(1);
+  if (scheduledToday) {
+    res.status(400).json({ error: "You already have a subscription pickup at this vendor today. À la carte is only for days outside your schedule." });
+    return;
+  }
+
+  const pricing = computeOffSchedulePricing(meal.priceNaira, vendor.offScheduleMarkupPercent);
+  const reference = `chopplan_alc_${crypto.randomUUID()}`;
+
+  const [payment] = await db
+    .insert(paymentsTable)
+    .values({
+      userId: user.id,
+      vendorId: vendor.id,
+      orderType: "alacarte",
+      mealId: meal.id,
+      orderDate: today,
+      vendorPriceNaira: pricing.vendorPriceNaira,
+      offScheduleMarkupNaira: pricing.offScheduleMarkupNaira,
+      pickupStatus: "pending",
+      reference,
+      amountNaira: pricing.totalPriceNaira,
+      status: "pending",
+    })
+    .returning();
+
+  try {
+    const tx = await initializeTransaction({
+      email: user.email,
+      amountNaira: pricing.totalPriceNaira,
+      reference: payment.reference,
+      callbackUrl,
+      metadata: { userId: user.id, vendorId: vendor.id, mealId: meal.id, orderType: "alacarte" },
+    });
+    res.status(201).json({
+      reference: payment.reference,
+      authorizationUrl: tx.authorizationUrl,
+      amountNaira: pricing.totalPriceNaira,
+    });
+  } catch (err) {
+    await markPaymentFailed(payment, err instanceof PaystackError ? err.message : "Failed to start checkout");
+    res.status(502).json({ error: err instanceof PaystackError ? err.message : "Failed to start checkout with Paystack" });
+  }
+});
+
+// GET /user/alacarte/orders
+router.get("/user/alacarte/orders", requireAuth("user"), async (req: AuthRequest, res) => {
+  const orders = await db
+    .select({
+      id: paymentsTable.id,
+      vendorId: paymentsTable.vendorId,
+      vendorName: vendorsTable.businessName,
+      mealId: paymentsTable.mealId,
+      mealName: mealsTable.name,
+      orderDate: paymentsTable.orderDate,
+      amountNaira: paymentsTable.amountNaira,
+      status: paymentsTable.status,
+      pickupStatus: paymentsTable.pickupStatus,
+      pickupConfirmedAt: paymentsTable.pickupConfirmedAt,
+      createdAt: paymentsTable.createdAt,
+    })
+    .from(paymentsTable)
+    .innerJoin(vendorsTable, eq(paymentsTable.vendorId, vendorsTable.id))
+    .leftJoin(mealsTable, eq(paymentsTable.mealId, mealsTable.id))
+    .where(and(eq(paymentsTable.userId, req.session!.id), eq(paymentsTable.orderType, "alacarte")))
+    .orderBy(desc(paymentsTable.createdAt));
+
+  res.json(
+    orders.map((o) => ({
+      id: o.id,
+      vendorId: o.vendorId,
+      vendorName: o.vendorName,
+      mealId: o.mealId,
+      mealName: o.mealName ?? null,
+      orderDate: o.orderDate,
+      amountNaira: o.amountNaira,
+      status: o.status as "pending" | "success" | "failed",
+      pickupStatus: (o.pickupStatus ?? null) as "pending" | "confirmed" | null,
+      pickupConfirmedAt: o.pickupConfirmedAt,
+      createdAt: o.createdAt,
+    }))
+  );
+});
+
+// POST /user/alacarte/:paymentId/confirm
+// Customer confirms they've picked up an à la carte order, mirroring how
+// subscription pickup days are confirmed.
+router.post("/user/alacarte/:paymentId/confirm", requireAuth("user"), async (req: AuthRequest, res) => {
+  const paymentId = Number(req.params.paymentId);
+  const [payment] = await db
+    .select()
+    .from(paymentsTable)
+    .where(and(eq(paymentsTable.id, paymentId), eq(paymentsTable.userId, req.session!.id), eq(paymentsTable.orderType, "alacarte")));
+  if (!payment) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  if (payment.status !== "success") {
+    res.status(400).json({ error: "This order has not been paid for yet" });
+    return;
+  }
+  if (payment.pickupStatus === "confirmed") {
+    res.status(400).json({ error: "This order is already confirmed" });
+    return;
+  }
+  const [updated] = await db
+    .update(paymentsTable)
+    .set({ pickupStatus: "confirmed", pickupConfirmedAt: new Date(), updatedAt: new Date() })
+    .where(eq(paymentsTable.id, paymentId))
+    .returning();
+
+  res.json({
+    id: updated.id,
+    orderDate: updated.orderDate,
+    amountNaira: updated.amountNaira,
+    pickupStatus: updated.pickupStatus as "pending" | "confirmed",
+    pickupConfirmedAt: updated.pickupConfirmedAt,
+  });
 });
 
 // DELETE /user/subscriptions/:subscriptionId
@@ -192,8 +366,17 @@ router.get("/user/subscriptions/:subscriptionId/schedule", requireAuth("user"), 
     return;
   }
   const days = await db
-    .select()
+    .select({
+      id: subscriptionDaysTable.id,
+      dayNumber: subscriptionDaysTable.dayNumber,
+      scheduledDate: subscriptionDaysTable.scheduledDate,
+      status: subscriptionDaysTable.status,
+      confirmedAt: subscriptionDaysTable.confirmedAt,
+      isFreeDay: subscriptionDaysTable.isFreeDay,
+      mealName: mealsTable.name,
+    })
     .from(subscriptionDaysTable)
+    .leftJoin(mealsTable, eq(subscriptionDaysTable.mealId, mealsTable.id))
     .where(eq(subscriptionDaysTable.subscriptionId, subscriptionId))
     .orderBy(asc(subscriptionDaysTable.dayNumber));
 
@@ -203,6 +386,8 @@ router.get("/user/subscriptions/:subscriptionId/schedule", requireAuth("user"), 
     scheduledDate: d.scheduledDate,
     status: d.status as "pending" | "confirmed",
     confirmedAt: d.confirmedAt,
+    isFreeDay: d.isFreeDay,
+    mealName: d.mealName ?? null,
   })));
 });
 
@@ -241,12 +426,15 @@ router.post("/user/subscriptions/:subscriptionId/schedule/:dayId/confirm", requi
     .where(eq(subscriptionDaysTable.id, dayId))
     .returning();
 
+  const [meal] = updated.mealId ? await db.select().from(mealsTable).where(eq(mealsTable.id, updated.mealId)) : [];
   res.json({
     id: updated.id,
     dayNumber: updated.dayNumber,
     scheduledDate: updated.scheduledDate,
     status: updated.status as "pending" | "confirmed",
     confirmedAt: updated.confirmedAt,
+    isFreeDay: updated.isFreeDay,
+    mealName: meal?.name ?? null,
   });
 });
 

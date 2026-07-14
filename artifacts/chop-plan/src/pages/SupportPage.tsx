@@ -25,7 +25,7 @@ export default function SupportPage() {
               <li><Link href="#" className="text-primary hover:underline">How to manage your subscriptions</Link></li>
               <li><Link href="#" className="text-primary hover:underline">Updating your payment method</Link></li>
               <li><Link href="#" className="text-primary hover:underline">Vendor payout schedule</Link></li>
-              <li><Link href="#" className="text-primary hover:underline">Delivery vs Pickup: How it works</Link></li>
+              <li><Link href="#" className="text-primary hover:underline">Basic vs Premium plans: How pickup works</Link></li>
             </ul>
             <Button variant="outline" className="w-full">View all articles</Button>
           </CardContent>

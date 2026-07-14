@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface PlanMealsResult {
-  planId: number;
-  mealIds: number[];
+export interface OffScheduleRevenue {
+  orderCount: number;
+  totalOffScheduleMarkupNaira: number;
 }

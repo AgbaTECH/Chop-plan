@@ -5,15 +5,16 @@ import {
   mealsTable,
   subscriptionsTable,
   subscriptionPlansTable,
+  planTimetableTable,
   usersTable,
   subscriptionDaysTable,
   vendorWithdrawalsTable,
   vendorBankAccountsTable,
-  planMealsTable,
+  paymentsTable,
 } from "@workspace/db";
 import { eq, and, sql, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
-import { perDayShareNaira } from "../lib/schedule";
+import { perDayShareNaira, PREMIUM_DAYS_PER_MONTH, PREMIUM_FREE_DAYS } from "../lib/schedule";
 import { listBanks, resolveAccountNumber, createTransferRecipient, initiateTransfer, PaystackError } from "../lib/paystack";
 import { logger } from "../lib/logger";
 import crypto from "node:crypto";
@@ -91,7 +92,7 @@ router.get("/vendor/dashboard", requireAuth("vendor"), async (req: AuthRequest, 
   const weeklyRevenue = Math.round(monthlyRevenue / 4);
 
   const planBreakdown = plans.map((p) => ({
-    planName: p.name,
+    planName: p.tier === "basic" ? "Basic" : "Premium",
     subscriberCount: planCounts.get(p.id) ?? 0,
     revenueNaira: (planCounts.get(p.id) ?? 0) * p.priceNaira,
   }));
@@ -114,7 +115,7 @@ router.get("/vendor/customers", requireAuth("vendor"), async (req: AuthRequest, 
       id: subscriptionsTable.id,
       name: usersTable.name,
       phone: usersTable.phone,
-      planName: subscriptionPlansTable.name,
+      tier: subscriptionPlansTable.tier,
       startDate: subscriptionsTable.startDate,
       status: subscriptionsTable.status,
       priceNaira: subscriptionPlansTable.priceNaira,
@@ -128,7 +129,7 @@ router.get("/vendor/customers", requireAuth("vendor"), async (req: AuthRequest, 
     id: r.id,
     name: r.name,
     phone: r.phone,
-    planName: r.planName,
+    planName: r.tier === "basic" ? "Basic" : "Premium",
     startDate: r.startDate,
     status: r.status as "active" | "paused" | "cancelled",
     priceNaira: r.priceNaira,
@@ -155,7 +156,7 @@ router.get("/vendor/earnings", requireAuth("vendor"), async (req: AuthRequest, r
     const count = planCounts.get(p.id) ?? 0;
     const revenue = count * p.priceNaira;
     monthly += revenue;
-    return { planName: p.name, subscriberCount: count, revenueNaira: revenue };
+    return { planName: p.tier === "basic" ? "Basic" : "Premium", subscriberCount: count, revenueNaira: revenue };
   });
 
   const weekly = Math.round(monthly / 4);
@@ -167,73 +168,215 @@ router.get("/vendor/earnings", requireAuth("vendor"), async (req: AuthRequest, r
   res.json({ weekly, monthly, weeklyByPlan, monthlyByPlan });
 });
 
-// GET /vendor/plans
+// GET /vendor/plans — the vendor's Basic and/or Premium plan (each optional).
 router.get("/vendor/plans", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
   const plans = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.vendorId, vendorId));
-  if (plans.length === 0) {
-    res.json([]);
-    return;
+  const basic = plans.find((p) => p.tier === "basic");
+  const premium = plans.find((p) => p.tier === "premium");
+
+  let premiumOut = null;
+  if (premium) {
+    const timetable = await db
+      .select()
+      .from(planTimetableTable)
+      .where(eq(planTimetableTable.planId, premium.id))
+      .orderBy(asc(planTimetableTable.dayOfWeek));
+    const freeDayRows = timetable.filter((t) => t.isFreeDay);
+    // Never surface a Premium plan with an incomplete timetable (e.g. left
+    // partial by a bug) — treat it as "not set up" so the vendor is prompted
+    // to fix it via the edit dialog rather than the UI dereferencing a
+    // missing freeDay/rotation entry.
+    if (timetable.length === 5 && freeDayRows.length === 1) {
+      premiumOut = {
+        id: premium.id,
+        priceNaira: premium.priceNaira,
+        daysPerMonth: premium.daysPerMonth,
+        freeDays: premium.freeDays,
+        rotation: timetable.filter((t) => !t.isFreeDay).map((t) => ({ dayOfWeek: t.dayOfWeek, mealId: t.mealId })),
+        freeDay: { dayOfWeek: freeDayRows[0].dayOfWeek, mealId: freeDayRows[0].mealId },
+      };
+    }
   }
-  const planIds = plans.map((p) => p.id);
-  const links = await db
-    .select({ planId: planMealsTable.planId, mealId: planMealsTable.mealId })
-    .from(planMealsTable)
-    .where(inArray(planMealsTable.planId, planIds));
-  const mealIdsByPlan = new Map<number, number[]>();
-  for (const link of links) {
-    const list = mealIdsByPlan.get(link.planId) ?? [];
-    list.push(link.mealId);
-    mealIdsByPlan.set(link.planId, list);
-  }
-  res.json(plans.map((p) => ({
-    id: p.id,
-    name: p.name,
-    daysPerMonth: p.daysPerMonth,
-    freeDays: p.freeDays,
-    priceNaira: p.priceNaira,
-    includesDelivery: p.includesDelivery,
-    mealIds: mealIdsByPlan.get(p.id) ?? [],
-  })));
+
+  res.json({
+    basic: basic
+      ? { id: basic.id, priceNaira: basic.priceNaira, daysPerMonth: basic.daysPerMonth, freeDays: basic.freeDays, mealId: basic.basicMealId }
+      : null,
+    premium: premiumOut,
+  });
 });
 
-// PUT /vendor/plans/:planId/meals
-router.put("/vendor/plans/:planId/meals", requireAuth("vendor"), async (req: AuthRequest, res) => {
+// PUT /vendor/plans/basic — create or update the vendor's Basic plan: one
+// fixed meal, no timetable, no rotation.
+router.put("/vendor/plans/basic", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const planId = Number(req.params.planId);
-  const mealIdsInput = req.body?.mealIds;
-  if (!Array.isArray(mealIdsInput) || !mealIdsInput.every((id) => typeof id === "number")) {
-    res.status(400).json({ error: "mealIds must be an array of numbers" });
+  const { priceNaira, daysPerMonth, freeDays, mealId } = req.body ?? {};
+  if (!priceNaira || priceNaira <= 0 || !daysPerMonth || daysPerMonth <= 0 || freeDays === undefined || freeDays < 0 || !mealId) {
+    res.status(400).json({ error: "priceNaira, daysPerMonth, freeDays and mealId are required" });
     return;
   }
-  const mealIds = [...new Set(mealIdsInput)];
 
+  const [meal] = await db.select().from(mealsTable).where(and(eq(mealsTable.id, mealId), eq(mealsTable.vendorId, vendorId)));
+  if (!meal) {
+    res.status(400).json({ error: "That meal does not belong to this vendor" });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(subscriptionPlansTable)
+    .where(and(eq(subscriptionPlansTable.vendorId, vendorId), eq(subscriptionPlansTable.tier, "basic")));
+
+  const values = { vendorId, tier: "basic" as const, priceNaira, daysPerMonth, freeDays, basicMealId: mealId };
+  const [plan] = existing
+    ? await db.update(subscriptionPlansTable).set(values).where(eq(subscriptionPlansTable.id, existing.id)).returning()
+    : await db.insert(subscriptionPlansTable).values(values).returning();
+
+  res.status(existing ? 200 : 201).json({
+    id: plan.id, priceNaira: plan.priceNaira, daysPerMonth: plan.daysPerMonth, freeDays: plan.freeDays, mealId: plan.basicMealId,
+  });
+});
+
+// PUT /vendor/plans/premium — create or update the vendor's Premium plan:
+// requires 2+ menu items, exactly 4 rotation days (one meal each) plus one
+// free day whose meal is distinct from every rotation meal.
+router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const { priceNaira, rotation, freeDay } = req.body ?? {};
+
+  if (!priceNaira || priceNaira <= 0) {
+    res.status(400).json({ error: "priceNaira is required" });
+    return;
+  }
+  if (!Array.isArray(rotation) || rotation.length !== 4) {
+    res.status(400).json({ error: "Premium requires exactly 4 rotation days" });
+    return;
+  }
+  const validEntry = (e: any) => e && typeof e.dayOfWeek === "number" && e.dayOfWeek >= 0 && e.dayOfWeek <= 6 && typeof e.mealId === "number";
+  if (!freeDay || !validEntry(freeDay)) {
+    res.status(400).json({ error: "Premium requires exactly 1 free day with a valid dayOfWeek (0-6) and mealId" });
+    return;
+  }
+  if (!rotation.every(validEntry)) {
+    res.status(400).json({ error: "Each rotation day needs a valid dayOfWeek (0-6) and mealId" });
+    return;
+  }
+
+  const rotationDays = rotation.map((e: any) => e.dayOfWeek);
+  if (new Set(rotationDays).size !== 4) {
+    res.status(400).json({ error: "Rotation days must be 4 distinct days of the week" });
+    return;
+  }
+  if (rotationDays.includes(freeDay.dayOfWeek)) {
+    res.status(400).json({ error: "The free day must be a different day from the 4 rotation days" });
+    return;
+  }
+  const rotationMealIds = rotation.map((e: any) => e.mealId);
+  if (rotationMealIds.includes(freeDay.mealId)) {
+    res.status(400).json({ error: "The free-day meal must be different from all 4 rotation meals" });
+    return;
+  }
+
+  const [{ mealCount }] = await db
+    .select({ mealCount: sql<number>`count(*)::int` })
+    .from(mealsTable)
+    .where(eq(mealsTable.vendorId, vendorId));
+  if (mealCount < 2) {
+    res.status(400).json({ error: "Premium requires at least 2 menu items" });
+    return;
+  }
+
+  const allMealIds = [...new Set([...rotationMealIds, freeDay.mealId])];
+  const ownedMeals = await db
+    .select({ id: mealsTable.id })
+    .from(mealsTable)
+    .where(and(inArray(mealsTable.id, allMealIds), eq(mealsTable.vendorId, vendorId)));
+  if (ownedMeals.length !== allMealIds.length) {
+    res.status(400).json({ error: "One or more meals do not belong to this vendor" });
+    return;
+  }
+
+  // Plan row + full timetable replacement must succeed or fail together —
+  // otherwise a failed insert after the delete would leave the plan with an
+  // incomplete timetable (fewer than 4 rotation days + 1 free day), which
+  // would silently break schedule generation at checkout.
+  try {
+    const { plan, wasExisting } = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(subscriptionPlansTable)
+        .where(and(eq(subscriptionPlansTable.vendorId, vendorId), eq(subscriptionPlansTable.tier, "premium")));
+
+      const values = {
+        vendorId,
+        tier: "premium" as const,
+        priceNaira,
+        daysPerMonth: PREMIUM_DAYS_PER_MONTH,
+        freeDays: PREMIUM_FREE_DAYS,
+        basicMealId: null,
+      };
+      const [savedPlan] = existing
+        ? await tx.update(subscriptionPlansTable).set(values).where(eq(subscriptionPlansTable.id, existing.id)).returning()
+        : await tx.insert(subscriptionPlansTable).values(values).returning();
+
+      await tx.delete(planTimetableTable).where(eq(planTimetableTable.planId, savedPlan.id));
+      const inserted = await tx.insert(planTimetableTable).values([
+        ...rotation.map((e: any) => ({ planId: savedPlan.id, dayOfWeek: e.dayOfWeek, mealId: e.mealId, isFreeDay: false })),
+        { planId: savedPlan.id, dayOfWeek: freeDay.dayOfWeek, mealId: freeDay.mealId, isFreeDay: true },
+      ]).returning();
+
+      // Belt-and-suspenders: confirm exactly 5 rows (4 rotation + 1 free) were
+      // actually persisted before committing, so a partial insert can never
+      // be committed as a "successful" save.
+      if (inserted.length !== 5 || inserted.filter((r) => r.isFreeDay).length !== 1) {
+        throw new Error("Failed to persist a complete Premium timetable");
+      }
+
+      return { plan: savedPlan, wasExisting: !!existing };
+    });
+
+    res.status(wasExisting ? 200 : 201).json({
+      id: plan.id,
+      priceNaira: plan.priceNaira,
+      daysPerMonth: plan.daysPerMonth,
+      freeDays: plan.freeDays,
+      rotation,
+      freeDay,
+    });
+  } catch (err) {
+    logger.error({ err, vendorId }, "Failed to save Premium plan");
+    res.status(500).json({ error: "Failed to save Premium plan. Please try again." });
+  }
+});
+
+// DELETE /vendor/plans/:tier — disable a tier. Blocked while an active
+// subscriber still depends on it, so a plan can't disappear under them.
+router.delete("/vendor/plans/:tier", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const tier = req.params.tier;
+  if (tier !== "basic" && tier !== "premium") {
+    res.status(400).json({ error: "tier must be 'basic' or 'premium'" });
+    return;
+  }
   const [plan] = await db
     .select()
     .from(subscriptionPlansTable)
-    .where(and(eq(subscriptionPlansTable.id, planId), eq(subscriptionPlansTable.vendorId, vendorId)));
+    .where(and(eq(subscriptionPlansTable.vendorId, vendorId), eq(subscriptionPlansTable.tier, tier)));
   if (!plan) {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-
-  if (mealIds.length > 0) {
-    const ownedMeals = await db
-      .select({ id: mealsTable.id })
-      .from(mealsTable)
-      .where(and(inArray(mealsTable.id, mealIds), eq(mealsTable.vendorId, vendorId)));
-    if (ownedMeals.length !== mealIds.length) {
-      res.status(400).json({ error: "One or more meals do not belong to this vendor" });
-      return;
-    }
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(subscriptionsTable)
+    .where(and(eq(subscriptionsTable.planId, plan.id), eq(subscriptionsTable.status, "active")));
+  if (count > 0) {
+    res.status(400).json({ error: "Cannot remove a plan with active subscribers" });
+    return;
   }
-
-  await db.delete(planMealsTable).where(eq(planMealsTable.planId, planId));
-  if (mealIds.length > 0) {
-    await db.insert(planMealsTable).values(mealIds.map((mealId) => ({ planId, mealId })));
-  }
-
-  res.json({ planId, mealIds });
+  await db.delete(subscriptionPlansTable).where(eq(subscriptionPlansTable.id, plan.id));
+  res.json({ success: true, message: "Plan removed" });
 });
 
 // GET /vendor/meals
@@ -286,12 +429,45 @@ router.patch("/vendor/meals/:mealId", requireAuth("vendor"), async (req: AuthReq
   });
 });
 
-// DELETE /vendor/meals/:mealId
+// DELETE /vendor/meals/:mealId — blocked while the meal is still in use by
+// this vendor's Basic or Premium plan, since a delete would either null out
+// the Basic plan's meal or (via FK cascade) leave the Premium timetable with
+// fewer than 4 rotation days + 1 free day.
 router.delete("/vendor/meals/:mealId", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
   const mealId = Number(req.params.mealId);
+
+  const [usedAsBasic] = await db
+    .select({ id: subscriptionPlansTable.id })
+    .from(subscriptionPlansTable)
+    .where(and(eq(subscriptionPlansTable.vendorId, vendorId), eq(subscriptionPlansTable.basicMealId, mealId)));
+  if (usedAsBasic) {
+    res.status(400).json({ error: "This meal is used by your Basic plan. Change the Basic plan's meal before deleting it." });
+    return;
+  }
+
+  const [usedInPremium] = await db
+    .select({ id: planTimetableTable.id })
+    .from(planTimetableTable)
+    .innerJoin(subscriptionPlansTable, eq(planTimetableTable.planId, subscriptionPlansTable.id))
+    .where(and(eq(subscriptionPlansTable.vendorId, vendorId), eq(planTimetableTable.mealId, mealId)));
+  if (usedInPremium) {
+    res.status(400).json({ error: "This meal is used in your Premium timetable. Update the Premium plan before deleting it." });
+    return;
+  }
+
+  const [usedInAlacarteOrder] = await db
+    .select({ id: paymentsTable.id })
+    .from(paymentsTable)
+    .where(and(eq(paymentsTable.vendorId, vendorId), eq(paymentsTable.mealId, mealId)));
+  if (usedInAlacarteOrder) {
+    res.status(400).json({ error: "This meal has à la carte order history and can't be deleted. Mark it unavailable instead." });
+    return;
+  }
+
   await db
     .delete(mealsTable)
-    .where(and(eq(mealsTable.id, mealId), eq(mealsTable.vendorId, req.session!.id)));
+    .where(and(eq(mealsTable.id, mealId), eq(mealsTable.vendorId, vendorId)));
   res.json({ success: true, message: "Meal deleted" });
 });
 
@@ -307,8 +483,17 @@ router.get("/vendor/customers/:subscriptionId/schedule", requireAuth("vendor"), 
     return;
   }
   const days = await db
-    .select()
+    .select({
+      id: subscriptionDaysTable.id,
+      dayNumber: subscriptionDaysTable.dayNumber,
+      scheduledDate: subscriptionDaysTable.scheduledDate,
+      status: subscriptionDaysTable.status,
+      confirmedAt: subscriptionDaysTable.confirmedAt,
+      isFreeDay: subscriptionDaysTable.isFreeDay,
+      mealName: mealsTable.name,
+    })
     .from(subscriptionDaysTable)
+    .leftJoin(mealsTable, eq(subscriptionDaysTable.mealId, mealsTable.id))
     .where(eq(subscriptionDaysTable.subscriptionId, subscriptionId))
     .orderBy(asc(subscriptionDaysTable.dayNumber));
 
@@ -318,6 +503,8 @@ router.get("/vendor/customers/:subscriptionId/schedule", requireAuth("vendor"), 
     scheduledDate: d.scheduledDate,
     status: d.status as "pending" | "confirmed",
     confirmedAt: d.confirmedAt,
+    isFreeDay: d.isFreeDay,
+    mealName: d.mealName ?? null,
   })));
 });
 
@@ -333,10 +520,29 @@ async function getVendorWalletSummary(vendorId: number) {
     .innerJoin(subscriptionPlansTable, eq(subscriptionsTable.planId, subscriptionPlansTable.id))
     .where(and(eq(subscriptionsTable.vendorId, vendorId), eq(subscriptionDaysTable.status, "confirmed")));
 
-  const earnedNaira = confirmedDays.reduce(
+  const subscriptionEarnedNaira = confirmedDays.reduce(
     (sum, d) => sum + perDayShareNaira(d.priceNaira, d.daysPerMonth, d.freeDays),
     0
   );
+
+  // À la carte payout: the vendor is paid exactly vendorPriceNaira (the raw
+  // meal price, stored at checkout time) once the customer confirms pickup
+  // — no share of the off-schedule markup, same as a normal redemption never
+  // gives the vendor a share of the 5% subscription markup.
+  const confirmedAlacarteOrders = await db
+    .select({ vendorPriceNaira: paymentsTable.vendorPriceNaira })
+    .from(paymentsTable)
+    .where(
+      and(
+        eq(paymentsTable.vendorId, vendorId),
+        eq(paymentsTable.orderType, "alacarte"),
+        eq(paymentsTable.status, "success"),
+        eq(paymentsTable.pickupStatus, "confirmed")
+      )
+    );
+  const alacarteEarnedNaira = confirmedAlacarteOrders.reduce((sum, o) => sum + (o.vendorPriceNaira ?? 0), 0);
+
+  const earnedNaira = subscriptionEarnedNaira + alacarteEarnedNaira;
 
   const withdrawals = await db
     .select()

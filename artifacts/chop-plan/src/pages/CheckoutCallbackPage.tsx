@@ -58,13 +58,15 @@ export default function CheckoutCallbackPage() {
           {status === "pending" && <Loader2 className="w-14 h-14 text-muted-foreground mx-auto mb-2 animate-spin" data-testid="icon-payment-pending" />}
 
           <CardTitle className="font-serif text-2xl">
-            {status === "success" && "Subscription Confirmed!"}
+            {status === "success" && data?.orderType === "alacarte" && "Order Confirmed!"}
+            {status === "success" && data?.orderType !== "alacarte" && "Subscription Confirmed!"}
             {status === "failed" && "Payment Declined"}
             {status === "error" && "Couldn't Verify Payment"}
             {status === "pending" && "Confirming Your Payment..."}
           </CardTitle>
           <CardDescription>
-            {status === "success" && "Your lunch is sorted. You can manage this in your dashboard."}
+            {status === "success" && data?.orderType === "alacarte" && "Your meal is ready to pick up. You can manage this in your dashboard."}
+            {status === "success" && data?.orderType !== "alacarte" && "Your lunch is sorted. You can manage this in your dashboard."}
             {status === "failed" && (data?.message || "Your payment could not be completed.")}
             {status === "error" && "Something went wrong while checking your payment. Please check your dashboard or try again."}
             {status === "pending" && "This usually takes a few seconds. Please don't close this page."}

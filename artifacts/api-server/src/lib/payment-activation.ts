@@ -9,21 +9,23 @@ import {
   subscriptionsTable,
   subscriptionPlansTable,
   subscriptionDaysTable,
+  planTimetableTable,
   vendorsTable,
   type Payment,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { buildScheduleRows, totalScheduleDays } from "./schedule";
+import { buildBasicScheduleRows, buildPremiumScheduleRows, totalScheduleDays } from "./schedule";
 import { logger } from "./logger";
 
-// Activates the subscription tied to a successful payment. Idempotent and
-// safe under concurrency: the webhook and the manual verify endpoint can
-// both race to call this for the same payment, so the whole read-check-write
-// sequence runs inside a single DB transaction with a row lock on the
-// payment (`FOR UPDATE`) — the second caller blocks until the first commits,
-// then sees `subscriptionId` already set and returns without inserting a
-// second subscription.
-export async function activatePaymentSuccess(payment: Payment): Promise<{ subscriptionId: number }> {
+// Activates the subscription (or, for an à la carte order, simply finalizes
+// the payment — there's no schedule to generate) tied to a successful
+// payment. Idempotent and safe under concurrency: the webhook and the
+// manual verify endpoint can both race to call this for the same payment,
+// so the whole read-check-write sequence runs inside a single DB
+// transaction with a row lock on the payment (`FOR UPDATE`) — the second
+// caller blocks until the first commits, then sees `status === "success"`
+// already set and returns without doing anything twice.
+export async function activatePaymentSuccess(payment: Payment): Promise<{ subscriptionId: number | null }> {
   return db.transaction(async (tx) => {
     const [locked] = await tx
       .select()
@@ -34,10 +36,25 @@ export async function activatePaymentSuccess(payment: Payment): Promise<{ subscr
     if (!locked) {
       throw new Error("Payment disappeared during activation");
     }
-    if (locked.subscriptionId) {
+    if (locked.status === "success") {
       return { subscriptionId: locked.subscriptionId };
     }
 
+    if (locked.orderType === "alacarte") {
+      // No subscription/schedule to generate — the checkout endpoint already
+      // computed and persisted vendorPriceNaira/offScheduleMarkupNaira from
+      // the meal's raw price, so activation here is just finalizing payment
+      // status and opening the order up for pickup confirmation.
+      await tx
+        .update(paymentsTable)
+        .set({ status: "success", pickupStatus: "pending", updatedAt: new Date() })
+        .where(eq(paymentsTable.id, locked.id));
+      return { subscriptionId: null };
+    }
+
+    if (!locked.planId) {
+      throw new Error("Subscription payment is missing a planId");
+    }
     const [plan] = await tx.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.id, locked.planId));
     const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, locked.vendorId));
     if (!plan || !vendor) {
@@ -51,10 +68,34 @@ export async function activatePaymentSuccess(payment: Payment): Promise<{ subscr
       .values({ userId: locked.userId, vendorId: locked.vendorId, planId: locked.planId, startDate: today, status: "active" })
       .returning();
 
-    const scheduleRows = buildScheduleRows(sub.id, sub.startDate, totalScheduleDays(plan.daysPerMonth, plan.freeDays));
-    if (scheduleRows.length > 0) {
-      await tx.insert(subscriptionDaysTable).values(scheduleRows);
+    let scheduleRows;
+    if (plan.tier === "basic") {
+      if (!plan.basicMealId) {
+        throw new Error("Basic plan has no assigned meal");
+      }
+      scheduleRows = buildBasicScheduleRows(
+        sub.id,
+        sub.startDate,
+        totalScheduleDays(plan.daysPerMonth, plan.freeDays),
+        plan.basicMealId
+      );
+    } else {
+      const timetable = await tx.select().from(planTimetableTable).where(eq(planTimetableTable.planId, plan.id));
+      // A Premium plan must always carry exactly 4 rotation days + 1 free
+      // day. If it doesn't (e.g. left incomplete by a bug or partial write),
+      // refuse to activate rather than create a subscription with a broken
+      // or empty pickup schedule.
+      const freeDayCount = timetable.filter((t) => t.isFreeDay).length;
+      if (timetable.length !== 5 || freeDayCount !== 1) {
+        logger.error({ paymentId: locked.id, planId: plan.id, timetableRows: timetable.length }, "Refusing to activate: Premium plan timetable is incomplete");
+        throw new Error("This vendor's Premium plan is not fully set up. Please try again later.");
+      }
+      scheduleRows = buildPremiumScheduleRows(sub.id, sub.startDate, timetable);
     }
+    if (scheduleRows.length === 0) {
+      throw new Error("Failed to generate a pickup schedule for this subscription");
+    }
+    await tx.insert(subscriptionDaysTable).values(scheduleRows);
 
     await tx
       .update(paymentsTable)

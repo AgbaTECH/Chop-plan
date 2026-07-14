@@ -14,4 +14,7 @@ export interface ScheduleDay {
   status: ScheduleDayStatus;
   /** @nullable */
   confirmedAt: Date | null;
+  isFreeDay: boolean;
+  /** @nullable */
+  mealName: string | null;
 }

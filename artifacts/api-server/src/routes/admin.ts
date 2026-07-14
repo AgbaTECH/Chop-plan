@@ -6,6 +6,7 @@ import {
   subscriptionsTable,
   subscriptionPlansTable,
   leadsTable,
+  paymentsTable,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
@@ -168,6 +169,24 @@ router.delete("/admin/customers/:userId", requireAuth("admin"), async (req, res)
   const userId = Number(req.params.userId);
   await db.delete(usersTable).where(eq(usersTable.id, userId));
   res.json({ success: true, message: "Customer deleted" });
+});
+
+// GET /admin/revenue/off-schedule
+// Off-schedule (à la carte) markup revenue, tracked entirely separately from
+// the flat 5% subscription markup (which is never persisted — it's only
+// ever computed on the fly for display) so it can be reported independently.
+router.get("/admin/revenue/off-schedule", requireAuth("admin"), async (_req, res) => {
+  const orders = await db
+    .select({ offScheduleMarkupNaira: paymentsTable.offScheduleMarkupNaira })
+    .from(paymentsTable)
+    .where(and(eq(paymentsTable.orderType, "alacarte"), eq(paymentsTable.status, "success")));
+
+  const totalOffScheduleMarkupNaira = orders.reduce((sum, o) => sum + (o.offScheduleMarkupNaira ?? 0), 0);
+
+  res.json({
+    orderCount: orders.length,
+    totalOffScheduleMarkupNaira,
+  });
 });
 
 // GET /admin/leads

@@ -15,6 +15,22 @@ A subscription is only ever created after Paystack confirms the charge succeeded
 
 **How to apply:** any future work touching subscriptions/payments (e.g. vendor withdrawals, recurring billing) should keep using the same idempotent activation path rather than inserting subscription rows directly elsewhere. Also always validate that a plan actually belongs to the vendor it's being purchased under before charging.
 
+## Schema changes on the dev database
+
+`drizzle-kit push` fails non-interactively (`Interactive prompts require a TTY`) whenever it detects a possible table/column rename — there's no flag to script past that prompt.
+
+**Why:** its rename-disambiguation UI requires a real TTY; this environment can't provide one.
+
+**How to apply:** for structural changes agents can safely author by hand (drop/add columns, new tables, enums), apply the DDL directly via the `executeSql` CodeExecution callback as one transactional script, then re-run `drizzle-kit push` once to confirm zero drift. There's no seed npm script in this project — run `seed.ts`-style scripts directly with any workspace package's `tsx` binary (pnpm's workspace symlinks make cross-package module resolution work regardless of which package's `tsx` you invoke from). Truncate affected tables first (`CASCADE`) so reseeding doesn't collide with old rows on unique constraints.
+
+## Extending the payments table for new order types
+
+`paymentsTable` was extended (rather than adding a parallel order table) to support a second purchase type (à la carte / off-schedule) alongside subscriptions, by adding an `orderType` discriminator column and making `planId` nullable.
+
+**Why:** reusing the existing Paystack checkout/webhook/verify/idempotent-activation machinery avoided duplicating payment-provider integration and its race-safety guarantees (see the idempotent-activation entry above) for a second flow that's payment-shaped but not subscription-shaped.
+
+**How to apply:** when adding another kind of paid purchase, branch `activatePaymentSuccess` on the discriminator column instead of writing a parallel activation path, and check the idempotency guard uses the generic `status === "success"` condition (not something type-specific like `subscriptionId` presence) so every order type short-circuits correctly under concurrent webhook/verify races.
+
 ## Resend email (OTP / password reset)
 
 The project's Resend connection is in sandbox mode (no verified domain): sending from `onboarding@resend.dev` only succeeds when the recipient is the account owner's own verified email — sends to any other address fail with a 403. This is a real, current limitation, not a bug in app code.

@@ -26,6 +26,10 @@ import type {
   AdminStats,
   AdminVendor,
   AdminVendorInput,
+  AlacarteCheckoutInput,
+  AlacarteCheckoutResponse,
+  AlacarteOrder,
+  AlacarteOrderConfirmation,
   AuthResponse,
   BlogPost,
   CheckoutInput,
@@ -41,29 +45,33 @@ import type {
   Meal,
   MealInput,
   MealUpdate,
+  OffScheduleRevenue,
   PaymentStatus,
   PaystackBank,
-  PlanMealsResult,
+  PublicMeal,
+  PublicVendorPlans,
   ResendOtpInput,
   ResetPasswordInput,
   ScheduleDay,
-  SetPlanMealsInput,
   SetVendorBankAccountInput,
   SignupResponse,
-  SubscriptionPlan,
   SuccessResponse,
   UnverifiedResponse,
+  UpsertBasicPlanInput,
+  UpsertPremiumPlanInput,
   UserProfile,
   UserProfileUpdate,
   UserSignupInput,
   UserSubscription,
   Vendor,
   VendorBankAccount,
+  VendorBasicPlan,
   VendorCustomer,
   VendorDashboard,
   VendorDetail,
   VendorEarnings,
-  VendorPlanWithMeals,
+  VendorPlans,
+  VendorPremiumPlan,
   VendorProfile,
   VendorProfileUpdate,
   VendorSignupInput,
@@ -1419,9 +1427,9 @@ export const getListVendorMealsUrl = (vendorId: number,) => {
 /**
  * @summary Get meals offered by a vendor
  */
-export const listVendorMeals = async (vendorId: number, options?: RequestInit): Promise<Meal[]> => {
+export const listVendorMeals = async (vendorId: number, options?: RequestInit): Promise<PublicMeal[]> => {
 
-  return customFetch<Meal[]>(getListVendorMealsUrl(vendorId),
+  return customFetch<PublicMeal[]>(getListVendorMealsUrl(vendorId),
   {
     ...options,
     method: 'GET'
@@ -1496,9 +1504,9 @@ export const getListVendorPlansUrl = (vendorId: number,) => {
 /**
  * @summary Get subscription plans for a vendor
  */
-export const listVendorPlans = async (vendorId: number, options?: RequestInit): Promise<SubscriptionPlan[]> => {
+export const listVendorPlans = async (vendorId: number, options?: RequestInit): Promise<PublicVendorPlans> => {
 
-  return customFetch<SubscriptionPlan[]>(getListVendorPlansUrl(vendorId),
+  return customFetch<PublicVendorPlans>(getListVendorPlansUrl(vendorId),
   {
     ...options,
     method: 'GET'
@@ -2235,6 +2243,226 @@ export const useConfirmPickup = <TError = ErrorType<ErrorResponse>,
       return useMutation(getConfirmPickupMutationOptions(options));
     }
 
+export const getCheckoutAlacarteUrl = () => {
+
+
+
+
+  return `/api/user/alacarte/checkout`
+}
+
+/**
+ * No active subscription is required. Always priced from the meal's raw vendor price at the (higher) off-schedule markup rate — the server rejects the purchase if the customer already has a subscription pickup scheduled at this vendor today.
+ * @summary Start a Paystack checkout for an off-schedule, à la carte meal
+ */
+export const checkoutAlacarte = async (alacarteCheckoutInput: AlacarteCheckoutInput, options?: RequestInit): Promise<AlacarteCheckoutResponse> => {
+
+  return customFetch<AlacarteCheckoutResponse>(getCheckoutAlacarteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(alacarteCheckoutInput)
+  }
+);}
+
+
+
+
+
+export const getCheckoutAlacarteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutAlacarte>>, TError,{data: BodyType<AlacarteCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkoutAlacarte>>, TError,{data: BodyType<AlacarteCheckoutInput>}, TContext> => {
+
+const mutationKey = ['checkoutAlacarte'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkoutAlacarte>>, {data: BodyType<AlacarteCheckoutInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkoutAlacarte(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckoutAlacarteMutationResult = NonNullable<Awaited<ReturnType<typeof checkoutAlacarte>>>
+    export type CheckoutAlacarteMutationBody = BodyType<AlacarteCheckoutInput>
+    export type CheckoutAlacarteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Start a Paystack checkout for an off-schedule, à la carte meal
+ */
+export const useCheckoutAlacarte = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutAlacarte>>, TError,{data: BodyType<AlacarteCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkoutAlacarte>>,
+        TError,
+        {data: BodyType<AlacarteCheckoutInput>},
+        TContext
+      > => {
+      return useMutation(getCheckoutAlacarteMutationOptions(options));
+    }
+
+export const getListAlacarteOrdersUrl = () => {
+
+
+
+
+  return `/api/user/alacarte/orders`
+}
+
+/**
+ * @summary Get the user's à la carte order history
+ */
+export const listAlacarteOrders = async ( options?: RequestInit): Promise<AlacarteOrder[]> => {
+
+  return customFetch<AlacarteOrder[]>(getListAlacarteOrdersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAlacarteOrdersQueryKey = () => {
+    return [
+    `/api/user/alacarte/orders`
+    ] as const;
+    }
+
+
+export const getListAlacarteOrdersQueryOptions = <TData = Awaited<ReturnType<typeof listAlacarteOrders>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAlacarteOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAlacarteOrdersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAlacarteOrders>>> = ({ signal }) => listAlacarteOrders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAlacarteOrders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAlacarteOrdersQueryResult = NonNullable<Awaited<ReturnType<typeof listAlacarteOrders>>>
+export type ListAlacarteOrdersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the user's à la carte order history
+ */
+
+export function useListAlacarteOrders<TData = Awaited<ReturnType<typeof listAlacarteOrders>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAlacarteOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAlacarteOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getConfirmAlacartePickupUrl = (paymentId: number,) => {
+
+
+
+
+  return `/api/user/alacarte/${paymentId}/confirm`
+}
+
+/**
+ * @summary Confirm an à la carte order's pickup was received
+ */
+export const confirmAlacartePickup = async (paymentId: number, options?: RequestInit): Promise<AlacarteOrderConfirmation> => {
+
+  return customFetch<AlacarteOrderConfirmation>(getConfirmAlacartePickupUrl(paymentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfirmAlacartePickupMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAlacartePickup>>, TError,{paymentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmAlacartePickup>>, TError,{paymentId: number}, TContext> => {
+
+const mutationKey = ['confirmAlacartePickup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmAlacartePickup>>, {paymentId: number}> = (props) => {
+          const {paymentId} = props ?? {};
+
+          return  confirmAlacartePickup(paymentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmAlacartePickupMutationResult = NonNullable<Awaited<ReturnType<typeof confirmAlacartePickup>>>
+
+    export type ConfirmAlacartePickupMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Confirm an à la carte order's pickup was received
+ */
+export const useConfirmAlacartePickup = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAlacartePickup>>, TError,{paymentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmAlacartePickup>>,
+        TError,
+        {paymentId: number},
+        TContext
+      > => {
+      return useMutation(getConfirmAlacartePickupMutationOptions(options));
+    }
+
 export const getGetVendorProfileUrl = () => {
 
 
@@ -2623,11 +2851,11 @@ export const getListMyPlansUrl = () => {
 }
 
 /**
- * @summary Get vendor's own plans with their assigned menu items
+ * @summary Get vendor's own Basic and/or Premium plan
  */
-export const listMyPlans = async ( options?: RequestInit): Promise<VendorPlanWithMeals[]> => {
+export const listMyPlans = async ( options?: RequestInit): Promise<VendorPlans> => {
 
-  return customFetch<VendorPlanWithMeals[]>(getListMyPlansUrl(),
+  return customFetch<VendorPlans>(getListMyPlansUrl(),
   {
     ...options,
     method: 'GET'
@@ -2670,7 +2898,7 @@ export type ListMyPlansQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get vendor's own plans with their assigned menu items
+ * @summary Get vendor's own Basic and/or Premium plan
  */
 
 export function useListMyPlans<TData = Awaited<ReturnType<typeof listMyPlans>>, TError = ErrorType<unknown>>(
@@ -2691,26 +2919,25 @@ export function useListMyPlans<TData = Awaited<ReturnType<typeof listMyPlans>>, 
 
 
 
-export const getSetPlanMealsUrl = (planId: number,) => {
+export const getUpsertBasicPlanUrl = () => {
 
 
 
 
-  return `/api/vendor/plans/${planId}/meals`
+  return `/api/vendor/plans/basic`
 }
 
 /**
- * @summary Set the menu items included in a plan tier
+ * @summary Create or update the vendor's Basic plan
  */
-export const setPlanMeals = async (planId: number,
-    setPlanMealsInput: SetPlanMealsInput, options?: RequestInit): Promise<PlanMealsResult> => {
+export const upsertBasicPlan = async (upsertBasicPlanInput: UpsertBasicPlanInput, options?: RequestInit): Promise<VendorBasicPlan> => {
 
-  return customFetch<PlanMealsResult>(getSetPlanMealsUrl(planId),
+  return customFetch<VendorBasicPlan>(getUpsertBasicPlanUrl(),
   {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(setPlanMealsInput)
+    body: JSON.stringify(upsertBasicPlanInput)
   }
 );}
 
@@ -2718,11 +2945,11 @@ export const setPlanMeals = async (planId: number,
 
 
 
-export const getSetPlanMealsMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPlanMeals>>, TError,{planId: number;data: BodyType<SetPlanMealsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof setPlanMeals>>, TError,{planId: number;data: BodyType<SetPlanMealsInput>}, TContext> => {
+export const getUpsertBasicPlanMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertBasicPlan>>, TError,{data: BodyType<UpsertBasicPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertBasicPlan>>, TError,{data: BodyType<UpsertBasicPlanInput>}, TContext> => {
 
-const mutationKey = ['setPlanMeals'];
+const mutationKey = ['upsertBasicPlan'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2732,10 +2959,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setPlanMeals>>, {planId: number;data: BodyType<SetPlanMealsInput>}> = (props) => {
-          const {planId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertBasicPlan>>, {data: BodyType<UpsertBasicPlanInput>}> = (props) => {
+          const {data} = props ?? {};
 
-          return  setPlanMeals(planId,data,requestOptions)
+          return  upsertBasicPlan(data,requestOptions)
         }
 
 
@@ -2745,22 +2972,164 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type SetPlanMealsMutationResult = NonNullable<Awaited<ReturnType<typeof setPlanMeals>>>
-    export type SetPlanMealsMutationBody = BodyType<SetPlanMealsInput>
-    export type SetPlanMealsMutationError = ErrorType<ErrorResponse>
+    export type UpsertBasicPlanMutationResult = NonNullable<Awaited<ReturnType<typeof upsertBasicPlan>>>
+    export type UpsertBasicPlanMutationBody = BodyType<UpsertBasicPlanInput>
+    export type UpsertBasicPlanMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Set the menu items included in a plan tier
+ * @summary Create or update the vendor's Basic plan
  */
-export const useSetPlanMeals = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setPlanMeals>>, TError,{planId: number;data: BodyType<SetPlanMealsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useUpsertBasicPlan = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertBasicPlan>>, TError,{data: BodyType<UpsertBasicPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof setPlanMeals>>,
+        Awaited<ReturnType<typeof upsertBasicPlan>>,
         TError,
-        {planId: number;data: BodyType<SetPlanMealsInput>},
+        {data: BodyType<UpsertBasicPlanInput>},
         TContext
       > => {
-      return useMutation(getSetPlanMealsMutationOptions(options));
+      return useMutation(getUpsertBasicPlanMutationOptions(options));
+    }
+
+export const getUpsertPremiumPlanUrl = () => {
+
+
+
+
+  return `/api/vendor/plans/premium`
+}
+
+/**
+ * @summary Create or update the vendor's Premium plan (4-day rotation + 1 free day)
+ */
+export const upsertPremiumPlan = async (upsertPremiumPlanInput: UpsertPremiumPlanInput, options?: RequestInit): Promise<VendorPremiumPlan> => {
+
+  return customFetch<VendorPremiumPlan>(getUpsertPremiumPlanUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(upsertPremiumPlanInput)
+  }
+);}
+
+
+
+
+
+export const getUpsertPremiumPlanMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertPremiumPlan>>, TError,{data: BodyType<UpsertPremiumPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertPremiumPlan>>, TError,{data: BodyType<UpsertPremiumPlanInput>}, TContext> => {
+
+const mutationKey = ['upsertPremiumPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertPremiumPlan>>, {data: BodyType<UpsertPremiumPlanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertPremiumPlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertPremiumPlanMutationResult = NonNullable<Awaited<ReturnType<typeof upsertPremiumPlan>>>
+    export type UpsertPremiumPlanMutationBody = BodyType<UpsertPremiumPlanInput>
+    export type UpsertPremiumPlanMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create or update the vendor's Premium plan (4-day rotation + 1 free day)
+ */
+export const useUpsertPremiumPlan = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertPremiumPlan>>, TError,{data: BodyType<UpsertPremiumPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertPremiumPlan>>,
+        TError,
+        {data: BodyType<UpsertPremiumPlanInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertPremiumPlanMutationOptions(options));
+    }
+
+export const getDeleteVendorPlanUrl = (tier: 'basic' | 'premium',) => {
+
+
+
+
+  return `/api/vendor/plans/${tier}`
+}
+
+/**
+ * @summary Remove the vendor's Basic or Premium plan
+ */
+export const deleteVendorPlan = async (tier: 'basic' | 'premium', options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getDeleteVendorPlanUrl(tier),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteVendorPlanMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendorPlan>>, TError,{tier: 'basic' | 'premium'}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVendorPlan>>, TError,{tier: 'basic' | 'premium'}, TContext> => {
+
+const mutationKey = ['deleteVendorPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVendorPlan>>, {tier: 'basic' | 'premium'}> = (props) => {
+          const {tier} = props ?? {};
+
+          return  deleteVendorPlan(tier,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteVendorPlanMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVendorPlan>>>
+
+    export type DeleteVendorPlanMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove the vendor's Basic or Premium plan
+ */
+export const useDeleteVendorPlan = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendorPlan>>, TError,{tier: 'basic' | 'premium'}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteVendorPlan>>,
+        TError,
+        {tier: 'basic' | 'premium'},
+        TContext
+      > => {
+      return useMutation(getDeleteVendorPlanMutationOptions(options));
     }
 
 export const getListMyMealsUrl = () => {
@@ -3947,6 +4316,83 @@ export const useCreateAdminCustomer = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getCreateAdminCustomerMutationOptions(options));
     }
+
+export const getGetOffScheduleRevenueUrl = () => {
+
+
+
+
+  return `/api/admin/revenue/off-schedule`
+}
+
+/**
+ * @summary Off-schedule (à la carte) markup revenue, reported separately from subscription revenue
+ */
+export const getOffScheduleRevenue = async ( options?: RequestInit): Promise<OffScheduleRevenue> => {
+
+  return customFetch<OffScheduleRevenue>(getGetOffScheduleRevenueUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOffScheduleRevenueQueryKey = () => {
+    return [
+    `/api/admin/revenue/off-schedule`
+    ] as const;
+    }
+
+
+export const getGetOffScheduleRevenueQueryOptions = <TData = Awaited<ReturnType<typeof getOffScheduleRevenue>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOffScheduleRevenue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOffScheduleRevenueQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOffScheduleRevenue>>> = ({ signal }) => getOffScheduleRevenue({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOffScheduleRevenue>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOffScheduleRevenueQueryResult = NonNullable<Awaited<ReturnType<typeof getOffScheduleRevenue>>>
+export type GetOffScheduleRevenueQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Off-schedule (à la carte) markup revenue, reported separately from subscription revenue
+ */
+
+export function useGetOffScheduleRevenue<TData = Awaited<ReturnType<typeof getOffScheduleRevenue>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOffScheduleRevenue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOffScheduleRevenueQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListAdminLeadsUrl = () => {
 

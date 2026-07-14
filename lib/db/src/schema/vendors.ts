@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, varchar, real, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, real, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,10 @@ export const vendorsTable = pgTable("vendors", {
   coverImage: text("cover_image"),
   rating: real("rating").default(4.5).notNull(),
   verified: boolean("verified").default(false).notNull(),
+  // Admin-configurable override for the off-schedule (à la carte) markup
+  // percentage applied to this vendor's meals, e.g. 40 = 40%. Null means
+  // "use the global default" (see OFF_SCHEDULE_MARKUP_RATE in pricing.ts).
+  offScheduleMarkupPercent: integer("off_schedule_markup_percent"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -5,13 +5,13 @@
  * Chop Plan API - prepaid lunch subscription service for Lagos restaurants
  * OpenAPI spec version: 0.1.0
  */
+import type { TimetableDayInput } from './timetableDayInput';
 
-export interface VendorPlanWithMeals {
+export interface VendorPremiumPlan {
   id: number;
-  name: string;
+  priceNaira: number;
   daysPerMonth: number;
   freeDays: number;
-  priceNaira: number;
-  includesDelivery: boolean;
-  mealIds: number[];
+  rotation: TimetableDayInput[];
+  freeDay: TimetableDayInput;
 }

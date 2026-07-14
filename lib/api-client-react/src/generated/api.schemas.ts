@@ -135,21 +135,44 @@ export interface PlanMenuItem {
   category: string | null;
 }
 
-export interface SubscriptionPlan {
+export interface PublicBasicPlan {
   id: number;
-  name: string;
+  priceNaira: number;
   daysPerMonth: number;
   freeDays: number;
-  priceNaira: number;
-  includesDelivery: boolean;
-  menuItems?: PlanMenuItem[];
+  meal: PlanMenuItem;
 }
 
-export interface Meal {
+export interface PublicTimetableDay {
+  /**
+     * @minimum 0
+     * @maximum 6
+     */
+  dayOfWeek: number;
+  meal: PlanMenuItem;
+}
+
+export interface PublicPremiumPlan {
+  id: number;
+  priceNaira: number;
+  daysPerMonth: number;
+  freeDays: number;
+  rotation: PublicTimetableDay[];
+  freeDay: PublicTimetableDay;
+}
+
+export interface PublicVendorPlans {
+  basic?: PublicBasicPlan | null;
+  premium?: PublicPremiumPlan | null;
+}
+
+export interface PublicMeal {
   id: number;
   name: string;
   description: string;
   priceNaira: number;
+  /** The higher, off-schedule ("à la carte") price for buying this meal directly with no active subscription, on a day outside the customer's plan schedule. Always strictly greater than priceNaira. */
+  offSchedulePriceNaira: number;
   imageUrl: string;
   available: boolean;
   /** @nullable */
@@ -165,27 +188,64 @@ export interface VendorDetail {
   rating: number;
   subscriberCount: number;
   description: string;
-  plans: SubscriptionPlan[];
-  meals: Meal[];
+  plans: PublicVendorPlans;
+  meals: PublicMeal[];
 }
 
-export interface VendorPlanWithMeals {
+export interface VendorBasicPlan {
   id: number;
-  name: string;
+  priceNaira: number;
   daysPerMonth: number;
   freeDays: number;
+  /** @nullable */
+  mealId: number | null;
+}
+
+export interface TimetableDayInput {
+  /**
+     * @minimum 0
+     * @maximum 6
+     */
+  dayOfWeek: number;
+  mealId: number;
+}
+
+export interface VendorPremiumPlan {
+  id: number;
   priceNaira: number;
-  includesDelivery: boolean;
-  mealIds: number[];
+  daysPerMonth: number;
+  freeDays: number;
+  rotation: TimetableDayInput[];
+  freeDay: TimetableDayInput;
 }
 
-export interface SetPlanMealsInput {
-  mealIds: number[];
+export interface VendorPlans {
+  basic?: VendorBasicPlan | null;
+  premium?: VendorPremiumPlan | null;
 }
 
-export interface PlanMealsResult {
-  planId: number;
-  mealIds: number[];
+export interface UpsertBasicPlanInput {
+  priceNaira: number;
+  daysPerMonth: number;
+  freeDays: number;
+  mealId: number;
+}
+
+export interface UpsertPremiumPlanInput {
+  priceNaira: number;
+  rotation: TimetableDayInput[];
+  freeDay: TimetableDayInput;
+}
+
+export interface Meal {
+  id: number;
+  name: string;
+  description: string;
+  priceNaira: number;
+  imageUrl: string;
+  available: boolean;
+  /** @nullable */
+  category?: string | null;
 }
 
 export interface UserProfile {
@@ -247,12 +307,92 @@ export const PaymentStatusStatus = {
   failed: 'failed',
 } as const;
 
+export type PaymentStatusOrderType = typeof PaymentStatusOrderType[keyof typeof PaymentStatusOrderType];
+
+
+export const PaymentStatusOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
+
 export interface PaymentStatus {
   status: PaymentStatusStatus;
   /** @nullable */
   subscriptionId: number | null;
+  orderType: PaymentStatusOrderType;
+  paymentId: number;
   /** @nullable */
   message: string | null;
+}
+
+export interface AlacarteCheckoutInput {
+  vendorId: number;
+  mealId: number;
+  /** Where Paystack should redirect the customer after checkout */
+  callbackUrl: string;
+}
+
+export interface AlacarteCheckoutResponse {
+  reference: string;
+  authorizationUrl: string;
+  amountNaira: number;
+}
+
+export type AlacarteOrderStatus = typeof AlacarteOrderStatus[keyof typeof AlacarteOrderStatus];
+
+
+export const AlacarteOrderStatus = {
+  pending: 'pending',
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+/**
+ * @nullable
+ */
+export type AlacarteOrderPickupStatus = typeof AlacarteOrderPickupStatus[keyof typeof AlacarteOrderPickupStatus] | null;
+
+
+export const AlacarteOrderPickupStatus = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+} as const;
+
+export interface AlacarteOrder {
+  id: number;
+  vendorId: number;
+  vendorName: string;
+  /** @nullable */
+  mealId: number | null;
+  /** @nullable */
+  mealName: string | null;
+  /** @nullable */
+  orderDate: string | null;
+  amountNaira: number;
+  status: AlacarteOrderStatus;
+  /** @nullable */
+  pickupStatus: AlacarteOrderPickupStatus;
+  /** @nullable */
+  pickupConfirmedAt: string | null;
+  createdAt: string;
+}
+
+export type AlacarteOrderConfirmationPickupStatus = typeof AlacarteOrderConfirmationPickupStatus[keyof typeof AlacarteOrderConfirmationPickupStatus];
+
+
+export const AlacarteOrderConfirmationPickupStatus = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+} as const;
+
+export interface AlacarteOrderConfirmation {
+  id: number;
+  /** @nullable */
+  orderDate: string | null;
+  amountNaira: number;
+  pickupStatus: AlacarteOrderConfirmationPickupStatus;
+  /** @nullable */
+  pickupConfirmedAt: string | null;
 }
 
 export interface VendorProfile {
@@ -319,6 +459,11 @@ export interface VendorEarnings {
   monthlyByPlan: PlanBreakdown[];
 }
 
+export interface OffScheduleRevenue {
+  orderCount: number;
+  totalOffScheduleMarkupNaira: number;
+}
+
 export interface MealInput {
   name: string;
   description: string;
@@ -352,6 +497,9 @@ export interface ScheduleDay {
   status: ScheduleDayStatus;
   /** @nullable */
   confirmedAt: string | null;
+  isFreeDay: boolean;
+  /** @nullable */
+  mealName: string | null;
 }
 
 export type WalletWithdrawalStatus = typeof WalletWithdrawalStatus[keyof typeof WalletWithdrawalStatus];

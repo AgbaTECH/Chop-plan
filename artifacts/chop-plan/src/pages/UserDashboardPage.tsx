@@ -8,6 +8,8 @@ import {
   useUpdateUserProfile,
   useGetUserSubscriptionSchedule,
   useConfirmPickup,
+  useListAlacarteOrders,
+  useConfirmAlacartePickup,
   getGetUserSubscriptionScheduleQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, User, Clock, Utensils, AlertTriangle, CalendarCheck, Check } from "lucide-react";
+import { Calendar, User, Clock, Utensils, AlertTriangle, CalendarCheck, Check, ShoppingBag } from "lucide-react";
 
 function SubscriptionScheduleDialog({ subscriptionId, open, onOpenChange }: { subscriptionId: number | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
@@ -55,7 +57,11 @@ function SubscriptionScheduleDialog({ subscriptionId, open, onOpenChange }: { su
               const canConfirm = day.status === "pending" && dateStr <= todayStr;
               return (
                 <div key={day.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <span className="text-sm font-mono">Day {day.dayNumber} &middot; {new Date(day.scheduledDate).toLocaleDateString()}</span>
+                  <span className="text-sm font-mono">
+                    Day {day.dayNumber} &middot; {new Date(day.scheduledDate).toLocaleDateString()}
+                    {day.mealName && <> &middot; {day.mealName}</>}
+                    {day.isFreeDay && <> &middot; <span className="text-accent">Free day</span></>}
+                  </span>
                   {day.status === "confirmed" ? (
                     <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Confirmed</Badge>
                   ) : canConfirm ? (
@@ -96,10 +102,19 @@ export default function UserDashboardPage() {
 
   const { data: profile, isLoading: profileLoading } = useGetMe();
   const { data: subscriptions, isLoading: subsLoading } = useListUserSubscriptions();
+  const { data: alacarteOrders, isLoading: alacarteLoading } = useListAlacarteOrders();
   const updateProfile = useUpdateUserProfile();
   const cancelSub = useCancelSubscription();
+  const confirmAlacarte = useConfirmAlacartePickup();
   const [scheduleSubId, setScheduleSubId] = useState<number | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  const handleConfirmAlacarte = (paymentId: number) => {
+    confirmAlacarte.mutate({ paymentId }, {
+      onSuccess: () => toast({ title: "Order confirmed" }),
+      onError: (err: any) => toast({ title: "Could not confirm", description: err?.data?.error, variant: "destructive" }),
+    });
+  };
 
   useEffect(() => {
     if (profile) {
@@ -153,6 +168,9 @@ export default function UserDashboardPage() {
         <TabsList className="mb-8 font-mono border-b rounded-none bg-transparent h-12 w-full justify-start gap-8">
           <TabsTrigger value="subscriptions" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0">
             My Subscriptions
+          </TabsTrigger>
+          <TabsTrigger value="alacarte" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0" data-testid="tab-alacarte-orders">
+            À La Carte Orders
           </TabsTrigger>
           <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0">
             Profile Settings
@@ -279,6 +297,71 @@ export default function UserDashboardPage() {
               <p className="text-muted-foreground max-w-sm mx-auto mb-6">You aren't subscribed to any meal plans right now. Find a restaurant to get started.</p>
               <Button asChild className="font-mono">
                 <Link href="/vendors">Find Restaurants</Link>
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="alacarte" className="space-y-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-serif font-bold">Off-Schedule Orders</h2>
+            <Button asChild size="sm" variant="outline" className="font-mono">
+              <Link href="/vendors">Find More Food</Link>
+            </Button>
+          </div>
+
+          {alacarteLoading ? (
+            <div className="grid gap-4">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : alacarteOrders && alacarteOrders.length > 0 ? (
+            <div className="grid gap-4">
+              {alacarteOrders.map((order) => {
+                const canConfirm = order.status === "success" && order.pickupStatus === "pending";
+                return (
+                  <Card key={order.id} className="border-border">
+                    <CardContent className="p-5 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant={order.status === "success" ? "default" : order.status === "failed" ? "destructive" : "secondary"} className="font-mono text-xs uppercase">
+                            {order.status}
+                          </Badge>
+                          {order.pickupStatus === "confirmed" && (
+                            <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Picked Up</Badge>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-serif font-bold">
+                          {order.mealName || "Meal"} <span className="text-muted-foreground font-normal text-sm">from</span> {order.vendorName}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : ""} · ₦{order.amountNaira.toLocaleString('en-NG')}
+                        </p>
+                      </div>
+                      {canConfirm && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="font-mono shrink-0"
+                          onClick={() => handleConfirmAlacarte(order.id)}
+                          disabled={confirmAlacarte.isPending}
+                          data-testid={`button-confirm-alacarte-order-${order.id}`}
+                        >
+                          Confirm Received
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-card rounded-xl border border-dashed border-border">
+              <ShoppingBag className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+              <h3 className="text-2xl font-serif font-bold mb-2">No à la carte orders yet</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto mb-6">Buy directly from any restaurant on a day outside your plan schedule — no subscription needed.</p>
+              <Button asChild className="font-mono">
+                <Link href="/vendors">Browse Restaurants</Link>
               </Button>
             </div>
           )}

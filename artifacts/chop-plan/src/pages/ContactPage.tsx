@@ -62,8 +62,8 @@ export default function ContactPage() {
       answer: "Yes, you can cancel your subscription at any time. The cancellation will take effect at the end of your current billing cycle."
     },
     {
-      question: "Do you offer delivery?",
-      answer: "Delivery options depend on the individual vendor. Some offer in-house delivery, some use third-party logistics, and some are pick-up only. This information is clearly stated on each vendor's page."
+      question: "Is this delivery or pickup?",
+      answer: "All Chop Plan subscriptions are pickup-only — you collect your meal from the vendor's kitchen on your scheduled days."
     },
     {
       question: "How do I become a vendor?",

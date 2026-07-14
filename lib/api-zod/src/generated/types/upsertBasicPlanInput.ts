@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SetPlanMealsInput {
-  mealIds: number[];
+export interface UpsertBasicPlanInput {
+  priceNaira: number;
+  daysPerMonth: number;
+  freeDays: number;
+  mealId: number;
 }

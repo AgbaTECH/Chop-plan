@@ -2,10 +2,13 @@ import { db } from "@workspace/db";
 import {
   usersTable, vendorsTable, subscriptionPlansTable,
   mealsTable, subscriptionsTable, blogPostsTable,
-  adminsTable, subscriptionDaysTable,
+  adminsTable, subscriptionDaysTable, planTimetableTable,
 } from "@workspace/db";
 import { createHash } from "crypto";
-import { totalScheduleDays, buildScheduleRows } from "./lib/schedule";
+import {
+  totalScheduleDays, buildBasicScheduleRows, buildPremiumScheduleRows,
+  PREMIUM_DAYS_PER_MONTH, PREMIUM_FREE_DAYS,
+} from "./lib/schedule";
 
 function hashPassword(password: string): string {
   return createHash("sha256").update(password + "chop_plan_salt").digest("hex");
@@ -92,32 +95,7 @@ async function seed() {
     rating: 4.7,
   }).returning();
 
-  // -- Subscription Plans --
-  const plans: any[] = [];
-  for (const v of [v1, v2, v3, v4]) {
-    const multiplier = v.id === v2.id ? 1.3 : v.id === v1.id ? 1.1 : 1.0;
-    const [starter] = await db.insert(subscriptionPlansTable).values({
-      vendorId: v.id, name: "Starter",
-      daysPerMonth: 4, freeDays: 1,
-      priceNaira: Math.round(9200 * multiplier / 100) * 100,
-      includesDelivery: false,
-    }).returning();
-    const [standard] = await db.insert(subscriptionPlansTable).values({
-      vendorId: v.id, name: "Standard",
-      daysPerMonth: 12, freeDays: 3,
-      priceNaira: Math.round(27600 * multiplier / 100) * 100,
-      includesDelivery: false,
-    }).returning();
-    const [premium] = await db.insert(subscriptionPlansTable).values({
-      vendorId: v.id, name: "Premium",
-      daysPerMonth: 25, freeDays: 5,
-      priceNaira: Math.round(57500 * multiplier / 100) * 100,
-      includesDelivery: true,
-    }).returning();
-    plans.push({ vendorId: v.id, starter, standard, premium });
-  }
-
-  // -- Meals --
+  // -- Meals -- (created before plans, since Basic/Premium plans reference meal ids)
   const mealSets = [
     // Vendor 1 - Mama Nkechi's Kitchen
     { vendorId: v1.id, meals: [
@@ -145,34 +123,84 @@ async function seed() {
     ]},
   ];
 
+  const mealsByVendor = new Map<number, { id: number; name: string }[]>();
   for (const ms of mealSets) {
-    for (const m of ms.meals) {
-      await db.insert(mealsTable).values({ vendorId: ms.vendorId, ...m });
-    }
+    const inserted = await db.insert(mealsTable).values(ms.meals.map((m) => ({ vendorId: ms.vendorId, ...m }))).returning();
+    mealsByVendor.set(ms.vendorId, inserted);
   }
 
+  // -- Subscription Plans (Basic + Premium) --
+  // v1 and v2 offer both tiers; v3 is Basic-only; v4 is Premium-only — this
+  // exercises every combination the demo accounts need to keep working.
+  const [m1a, m1b, m1c] = mealsByVendor.get(v1.id)!;
+  const [m2a, m2b, m2c] = mealsByVendor.get(v2.id)!;
+  const [m3a] = mealsByVendor.get(v3.id)!;
+  const [m4a, m4b, m4c] = mealsByVendor.get(v4.id)!;
+
+  async function createBasicPlan(vendorId: number, priceNaira: number, mealId: number) {
+    const [plan] = await db.insert(subscriptionPlansTable).values({
+      vendorId, tier: "basic", priceNaira, daysPerMonth: 12, freeDays: 3, basicMealId: mealId,
+    }).returning();
+    return plan;
+  }
+
+  async function createPremiumPlan(
+    vendorId: number,
+    priceNaira: number,
+    rotation: { dayOfWeek: number; mealId: number }[],
+    freeDay: { dayOfWeek: number; mealId: number }
+  ) {
+    const [plan] = await db.insert(subscriptionPlansTable).values({
+      vendorId, tier: "premium", priceNaira, daysPerMonth: PREMIUM_DAYS_PER_MONTH, freeDays: PREMIUM_FREE_DAYS, basicMealId: null,
+    }).returning();
+    await db.insert(planTimetableTable).values([
+      ...rotation.map((r) => ({ planId: plan.id, dayOfWeek: r.dayOfWeek, mealId: r.mealId, isFreeDay: false })),
+      { planId: plan.id, dayOfWeek: freeDay.dayOfWeek, mealId: freeDay.mealId, isFreeDay: true },
+    ]);
+    return { plan, timetable: [...rotation.map((r) => ({ ...r, isFreeDay: false })), { ...freeDay, isFreeDay: true }] };
+  }
+
+  const v1Basic = await createBasicPlan(v1.id, 9200, m1a.id);
+  const v1Premium = await createPremiumPlan(v1.id, 57500, [
+    { dayOfWeek: 1, mealId: m1a.id }, { dayOfWeek: 2, mealId: m1b.id },
+    { dayOfWeek: 4, mealId: m1a.id }, { dayOfWeek: 5, mealId: m1b.id },
+  ], { dayOfWeek: 0, mealId: m1c.id });
+
+  const v2Basic = await createBasicPlan(v2.id, 12000, m2a.id);
+  const v2Premium = await createPremiumPlan(v2.id, 74800, [
+    { dayOfWeek: 1, mealId: m2a.id }, { dayOfWeek: 2, mealId: m2b.id },
+    { dayOfWeek: 4, mealId: m2a.id }, { dayOfWeek: 5, mealId: m2b.id },
+  ], { dayOfWeek: 0, mealId: m2c.id });
+
+  const v3Basic = await createBasicPlan(v3.id, 8300, m3a.id);
+
+  const v4Premium = await createPremiumPlan(v4.id, 62700, [
+    { dayOfWeek: 1, mealId: m4a.id }, { dayOfWeek: 2, mealId: m4b.id },
+    { dayOfWeek: 4, mealId: m4a.id }, { dayOfWeek: 5, mealId: m4b.id },
+  ], { dayOfWeek: 0, mealId: m4c.id });
+
   // -- Subscriptions --
-  const v1Plans = plans.find((p) => p.vendorId === v1.id)!;
-  const v2Plans = plans.find((p) => p.vendorId === v2.id)!;
-  const v3Plans = plans.find((p) => p.vendorId === v3.id)!;
   const today = new Date().toISOString().split("T")[0];
 
   const insertedSubs = await db.insert(subscriptionsTable).values([
-    { userId: user1.id, vendorId: v1.id, planId: v1Plans.standard.id, startDate: today, status: "active" },
-    { userId: user1.id, vendorId: v2.id, planId: v2Plans.starter.id, startDate: today, status: "active" },
-    { userId: user2.id, vendorId: v1.id, planId: v1Plans.premium.id, startDate: today, status: "active" },
-    { userId: user2.id, vendorId: v3.id, planId: v3Plans.standard.id, startDate: today, status: "active" },
-    { userId: user3.id, vendorId: v2.id, planId: v2Plans.standard.id, startDate: today, status: "active" },
+    { userId: user1.id, vendorId: v1.id, planId: v1Premium.plan.id, startDate: today, status: "active" },
+    { userId: user1.id, vendorId: v2.id, planId: v2Basic.id, startDate: today, status: "active" },
+    { userId: user2.id, vendorId: v1.id, planId: v1Basic.id, startDate: today, status: "active" },
+    { userId: user2.id, vendorId: v3.id, planId: v3Basic.id, startDate: today, status: "active" },
+    { userId: user3.id, vendorId: v2.id, planId: v2Premium.plan.id, startDate: today, status: "active" },
   ]).returning();
 
   // -- Pickup schedule rows for each seeded subscription --
-  const planById = new Map(
-    [v1Plans.standard, v1Plans.premium, v2Plans.starter, v2Plans.standard, v3Plans.standard].map((p) => [p.id, p])
-  );
+  const basicPlansById = new Map([v1Basic, v2Basic, v3Basic].map((p) => [p.id, p]));
+  const premiumPlansById = new Map([v1Premium, v2Premium, v4Premium].map((p) => [p.plan.id, p]));
   const scheduleRows = insertedSubs.flatMap((sub) => {
-    const plan = planById.get(sub.planId)!;
-    const totalDays = totalScheduleDays(plan.daysPerMonth, plan.freeDays);
-    return buildScheduleRows(sub.id, sub.startDate, totalDays);
+    const basicPlan = basicPlansById.get(sub.planId);
+    if (basicPlan) {
+      const totalDays = totalScheduleDays(basicPlan.daysPerMonth, basicPlan.freeDays);
+      return buildBasicScheduleRows(sub.id, sub.startDate, totalDays, basicPlan.basicMealId!);
+    }
+    const premiumPlan = premiumPlansById.get(sub.planId)!;
+    return buildPremiumScheduleRows(sub.id, sub.startDate, premiumPlan.timetable);
   });
   if (scheduleRows.length > 0) {
     await db.insert(subscriptionDaysTable).values(scheduleRows);

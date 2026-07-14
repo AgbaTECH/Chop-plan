@@ -5,12 +5,15 @@
  * Chop Plan API - prepaid lunch subscription service for Lagos restaurants
  * OpenAPI spec version: 0.1.0
  */
+import type { PaymentStatusOrderType } from './paymentStatusOrderType';
 import type { PaymentStatusStatus } from './paymentStatusStatus';
 
 export interface PaymentStatus {
   status: PaymentStatusStatus;
   /** @nullable */
   subscriptionId: number | null;
+  orderType: PaymentStatusOrderType;
+  paymentId: number;
   /** @nullable */
   message: string | null;
 }

@@ -288,6 +288,14 @@ export const GetVendorParams = zod.object({
   "vendorId": zod.coerce.number()
 })
 
+export const getVendorResponsePlansPremiumOneRotationItemDayOfWeekMin = 0;
+export const getVendorResponsePlansPremiumOneRotationItemDayOfWeekMax = 6;
+
+export const getVendorResponsePlansPremiumOneFreeDayDayOfWeekMin = 0;
+export const getVendorResponsePlansPremiumOneFreeDayDayOfWeekMax = 6;
+
+
+
 export const GetVendorResponse = zod.object({
   "id": zod.number(),
   "businessName": zod.string(),
@@ -297,26 +305,53 @@ export const GetVendorResponse = zod.object({
   "rating": zod.number(),
   "subscriberCount": zod.number(),
   "description": zod.string(),
-  "plans": zod.array(zod.object({
+  "plans": zod.object({
+  "basic": zod.union([zod.object({
   "id": zod.number(),
-  "name": zod.string(),
+  "priceNaira": zod.number(),
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
-  "priceNaira": zod.number(),
-  "includesDelivery": zod.boolean(),
-  "menuItems": zod.array(zod.object({
+  "meal": zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
   "imageUrl": zod.string(),
   "category": zod.string().nullable()
-})).optional()
+})
+}),zod.null()]).optional(),
+  "premium": zod.union([zod.object({
+  "id": zod.number(),
+  "priceNaira": zod.number(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "rotation": zod.array(zod.object({
+  "dayOfWeek": zod.number().min(getVendorResponsePlansPremiumOneRotationItemDayOfWeekMin).max(getVendorResponsePlansPremiumOneRotationItemDayOfWeekMax),
+  "meal": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "imageUrl": zod.string(),
+  "category": zod.string().nullable()
+})
 })),
+  "freeDay": zod.object({
+  "dayOfWeek": zod.number().min(getVendorResponsePlansPremiumOneFreeDayDayOfWeekMin).max(getVendorResponsePlansPremiumOneFreeDayDayOfWeekMax),
+  "meal": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "imageUrl": zod.string(),
+  "category": zod.string().nullable()
+})
+})
+}),zod.null()]).optional()
+}),
   "meals": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
   "priceNaira": zod.number(),
+  "offSchedulePriceNaira": zod.number().describe('The higher, off-schedule (\"à la carte\") price for buying this meal directly with no active subscription, on a day outside the customer\'s plan schedule. Always strictly greater than priceNaira.\n'),
   "imageUrl": zod.string(),
   "available": zod.boolean(),
   "category": zod.string().nullish()
@@ -336,6 +371,7 @@ export const ListVendorMealsResponseItem = zod.object({
   "name": zod.string(),
   "description": zod.string(),
   "priceNaira": zod.number(),
+  "offSchedulePriceNaira": zod.number().describe('The higher, off-schedule (\"à la carte\") price for buying this meal directly with no active subscription, on a day outside the customer\'s plan schedule. Always strictly greater than priceNaira.\n'),
   "imageUrl": zod.string(),
   "available": zod.boolean(),
   "category": zod.string().nullish()
@@ -350,22 +386,55 @@ export const ListVendorPlansParams = zod.object({
   "vendorId": zod.coerce.number()
 })
 
-export const ListVendorPlansResponseItem = zod.object({
+export const listVendorPlansResponsePremiumOneRotationItemDayOfWeekMin = 0;
+export const listVendorPlansResponsePremiumOneRotationItemDayOfWeekMax = 6;
+
+export const listVendorPlansResponsePremiumOneFreeDayDayOfWeekMin = 0;
+export const listVendorPlansResponsePremiumOneFreeDayDayOfWeekMax = 6;
+
+
+
+export const ListVendorPlansResponse = zod.object({
+  "basic": zod.union([zod.object({
   "id": zod.number(),
-  "name": zod.string(),
+  "priceNaira": zod.number(),
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
-  "priceNaira": zod.number(),
-  "includesDelivery": zod.boolean(),
-  "menuItems": zod.array(zod.object({
+  "meal": zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
   "imageUrl": zod.string(),
   "category": zod.string().nullable()
-})).optional()
 })
-export const ListVendorPlansResponse = zod.array(ListVendorPlansResponseItem)
+}),zod.null()]).optional(),
+  "premium": zod.union([zod.object({
+  "id": zod.number(),
+  "priceNaira": zod.number(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "rotation": zod.array(zod.object({
+  "dayOfWeek": zod.number().min(listVendorPlansResponsePremiumOneRotationItemDayOfWeekMin).max(listVendorPlansResponsePremiumOneRotationItemDayOfWeekMax),
+  "meal": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "imageUrl": zod.string(),
+  "category": zod.string().nullable()
+})
+})),
+  "freeDay": zod.object({
+  "dayOfWeek": zod.number().min(listVendorPlansResponsePremiumOneFreeDayDayOfWeekMin).max(listVendorPlansResponsePremiumOneFreeDayDayOfWeekMax),
+  "meal": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "imageUrl": zod.string(),
+  "category": zod.string().nullable()
+})
+})
+}),zod.null()]).optional()
+})
 
 
 /**
@@ -451,6 +520,8 @@ export const VerifyPaymentParams = zod.object({
 export const VerifyPaymentResponse = zod.object({
   "status": zod.enum(['pending', 'success', 'failed']),
   "subscriptionId": zod.number().nullable(),
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "paymentId": zod.number(),
   "message": zod.string().nullable()
 })
 
@@ -480,7 +551,9 @@ export const GetUserSubscriptionScheduleResponseItem = zod.object({
   "dayNumber": zod.number(),
   "scheduledDate": zod.coerce.date(),
   "status": zod.enum(['pending', 'confirmed']),
-  "confirmedAt": zod.coerce.date().nullable()
+  "confirmedAt": zod.coerce.date().nullable(),
+  "isFreeDay": zod.boolean(),
+  "mealName": zod.string().nullable()
 })
 export const GetUserSubscriptionScheduleResponse = zod.array(GetUserSubscriptionScheduleResponseItem)
 
@@ -498,7 +571,61 @@ export const ConfirmPickupResponse = zod.object({
   "dayNumber": zod.number(),
   "scheduledDate": zod.coerce.date(),
   "status": zod.enum(['pending', 'confirmed']),
-  "confirmedAt": zod.coerce.date().nullable()
+  "confirmedAt": zod.coerce.date().nullable(),
+  "isFreeDay": zod.boolean(),
+  "mealName": zod.string().nullable()
+})
+
+
+/**
+ * No active subscription is required. Always priced from the meal's raw vendor price at the (higher) off-schedule markup rate — the server rejects the purchase if the customer already has a subscription pickup scheduled at this vendor today.
+ * @summary Start a Paystack checkout for an off-schedule, à la carte meal
+ */
+export const CheckoutAlacarteBody = zod.object({
+  "vendorId": zod.number(),
+  "mealId": zod.number(),
+  "callbackUrl": zod.string().describe('Where Paystack should redirect the customer after checkout')
+})
+
+export const CheckoutAlacarteResponse = zod.object({
+  "reference": zod.string(),
+  "authorizationUrl": zod.string(),
+  "amountNaira": zod.number()
+})
+
+
+/**
+ * @summary Get the user's à la carte order history
+ */
+export const ListAlacarteOrdersResponseItem = zod.object({
+  "id": zod.number(),
+  "vendorId": zod.number(),
+  "vendorName": zod.string(),
+  "mealId": zod.number().nullable(),
+  "mealName": zod.string().nullable(),
+  "orderDate": zod.coerce.date().nullable(),
+  "amountNaira": zod.number(),
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "pickupStatus": zod.union([zod.literal('pending'),zod.literal('confirmed'),zod.literal(null)]).nullable(),
+  "pickupConfirmedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAlacarteOrdersResponse = zod.array(ListAlacarteOrdersResponseItem)
+
+
+/**
+ * @summary Confirm an à la carte order's pickup was received
+ */
+export const ConfirmAlacartePickupParams = zod.object({
+  "paymentId": zod.coerce.number()
+})
+
+export const ConfirmAlacartePickupResponse = zod.object({
+  "id": zod.number(),
+  "orderDate": zod.coerce.date().nullable(),
+  "amountNaira": zod.number(),
+  "pickupStatus": zod.enum(['pending', 'confirmed']),
+  "pickupConfirmedAt": zod.coerce.date().nullable()
 })
 
 
@@ -595,34 +722,117 @@ export const GetVendorEarningsResponse = zod.object({
 
 
 /**
- * @summary Get vendor's own plans with their assigned menu items
+ * @summary Get vendor's own Basic and/or Premium plan
  */
-export const ListMyPlansResponseItem = zod.object({
+export const listMyPlansResponsePremiumOneRotationItemDayOfWeekMin = 0;
+export const listMyPlansResponsePremiumOneRotationItemDayOfWeekMax = 6;
+
+export const listMyPlansResponsePremiumOneFreeDayDayOfWeekMin = 0;
+export const listMyPlansResponsePremiumOneFreeDayDayOfWeekMax = 6;
+
+
+
+export const ListMyPlansResponse = zod.object({
+  "basic": zod.union([zod.object({
   "id": zod.number(),
-  "name": zod.string(),
+  "priceNaira": zod.number(),
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
+  "mealId": zod.number().nullable()
+}),zod.null()]).optional(),
+  "premium": zod.union([zod.object({
+  "id": zod.number(),
   "priceNaira": zod.number(),
-  "includesDelivery": zod.boolean(),
-  "mealIds": zod.array(zod.number())
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "rotation": zod.array(zod.object({
+  "dayOfWeek": zod.number().min(listMyPlansResponsePremiumOneRotationItemDayOfWeekMin).max(listMyPlansResponsePremiumOneRotationItemDayOfWeekMax),
+  "mealId": zod.number()
+})),
+  "freeDay": zod.object({
+  "dayOfWeek": zod.number().min(listMyPlansResponsePremiumOneFreeDayDayOfWeekMin).max(listMyPlansResponsePremiumOneFreeDayDayOfWeekMax),
+  "mealId": zod.number()
 })
-export const ListMyPlansResponse = zod.array(ListMyPlansResponseItem)
+}),zod.null()]).optional()
+})
 
 
 /**
- * @summary Set the menu items included in a plan tier
+ * @summary Create or update the vendor's Basic plan
  */
-export const SetPlanMealsParams = zod.object({
-  "planId": zod.coerce.number()
+export const UpsertBasicPlanBody = zod.object({
+  "priceNaira": zod.number(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "mealId": zod.number()
 })
 
-export const SetPlanMealsBody = zod.object({
-  "mealIds": zod.array(zod.number())
+export const UpsertBasicPlanResponse = zod.object({
+  "id": zod.number(),
+  "priceNaira": zod.number(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "mealId": zod.number().nullable()
 })
 
-export const SetPlanMealsResponse = zod.object({
-  "planId": zod.number(),
-  "mealIds": zod.array(zod.number())
+
+/**
+ * @summary Create or update the vendor's Premium plan (4-day rotation + 1 free day)
+ */
+export const upsertPremiumPlanBodyRotationItemDayOfWeekMin = 0;
+export const upsertPremiumPlanBodyRotationItemDayOfWeekMax = 6;
+
+export const upsertPremiumPlanBodyFreeDayDayOfWeekMin = 0;
+export const upsertPremiumPlanBodyFreeDayDayOfWeekMax = 6;
+
+
+
+export const UpsertPremiumPlanBody = zod.object({
+  "priceNaira": zod.number(),
+  "rotation": zod.array(zod.object({
+  "dayOfWeek": zod.number().min(upsertPremiumPlanBodyRotationItemDayOfWeekMin).max(upsertPremiumPlanBodyRotationItemDayOfWeekMax),
+  "mealId": zod.number()
+})),
+  "freeDay": zod.object({
+  "dayOfWeek": zod.number().min(upsertPremiumPlanBodyFreeDayDayOfWeekMin).max(upsertPremiumPlanBodyFreeDayDayOfWeekMax),
+  "mealId": zod.number()
+})
+})
+
+export const upsertPremiumPlanResponseRotationItemDayOfWeekMin = 0;
+export const upsertPremiumPlanResponseRotationItemDayOfWeekMax = 6;
+
+export const upsertPremiumPlanResponseFreeDayDayOfWeekMin = 0;
+export const upsertPremiumPlanResponseFreeDayDayOfWeekMax = 6;
+
+
+
+export const UpsertPremiumPlanResponse = zod.object({
+  "id": zod.number(),
+  "priceNaira": zod.number(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "rotation": zod.array(zod.object({
+  "dayOfWeek": zod.number().min(upsertPremiumPlanResponseRotationItemDayOfWeekMin).max(upsertPremiumPlanResponseRotationItemDayOfWeekMax),
+  "mealId": zod.number()
+})),
+  "freeDay": zod.object({
+  "dayOfWeek": zod.number().min(upsertPremiumPlanResponseFreeDayDayOfWeekMin).max(upsertPremiumPlanResponseFreeDayDayOfWeekMax),
+  "mealId": zod.number()
+})
+})
+
+
+/**
+ * @summary Remove the vendor's Basic or Premium plan
+ */
+export const DeleteVendorPlanParams = zod.object({
+  "tier": zod.enum(['basic', 'premium'])
+})
+
+export const DeleteVendorPlanResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string().optional()
 })
 
 
@@ -716,7 +926,9 @@ export const GetVendorCustomerScheduleResponseItem = zod.object({
   "dayNumber": zod.number(),
   "scheduledDate": zod.coerce.date(),
   "status": zod.enum(['pending', 'confirmed']),
-  "confirmedAt": zod.coerce.date().nullable()
+  "confirmedAt": zod.coerce.date().nullable(),
+  "isFreeDay": zod.boolean(),
+  "mealName": zod.string().nullable()
 })
 export const GetVendorCustomerScheduleResponse = zod.array(GetVendorCustomerScheduleResponseItem)
 
@@ -914,6 +1126,15 @@ export const CreateAdminCustomerResponse = zod.object({
   "phone": zod.string(),
   "area": zod.string(),
   "activeSubscriptionCount": zod.number()
+})
+
+
+/**
+ * @summary Off-schedule (à la carte) markup revenue, reported separately from subscription revenue
+ */
+export const GetOffScheduleRevenueResponse = zod.object({
+  "orderCount": zod.number(),
+  "totalOffScheduleMarkupNaira": zod.number()
 })
 
 

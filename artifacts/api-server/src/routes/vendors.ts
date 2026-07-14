@@ -3,12 +3,12 @@ import { db } from "@workspace/db";
 import {
   vendorsTable,
   subscriptionPlansTable,
+  planTimetableTable,
   mealsTable,
   subscriptionsTable,
-  planMealsTable,
 } from "@workspace/db";
-import { eq, ilike, and, sql, inArray } from "drizzle-orm";
-import { toCustomerDisplayPriceNaira } from "../lib/pricing";
+import { eq, ilike, and, sql, inArray, asc } from "drizzle-orm";
+import { toCustomerDisplayPriceNaira, computeOffSchedulePricing } from "../lib/pricing";
 
 const router = Router();
 
@@ -61,6 +61,59 @@ router.get("/vendors", async (req, res) => {
   res.json(result);
 });
 
+// Shared helper: builds the public { basic, premium } plan payload for a
+// vendor, with full meal detail so a customer can preview the whole Premium
+// timetable (or the single Basic meal) before subscribing — no auth needed.
+async function buildPublicPlans(vendorId: number, mealsById: Map<number, typeof mealsTable.$inferSelect>) {
+  const plans = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.vendorId, vendorId));
+  const basicRow = plans.find((p) => p.tier === "basic");
+  const premiumRow = plans.find((p) => p.tier === "premium");
+
+  const toMealSummary = (mealId: number) => {
+    const m = mealsById.get(mealId);
+    return m ? { id: m.id, name: m.name, description: m.description, imageUrl: m.imageUrl, category: m.category ?? null } : null;
+  };
+
+  const basic = basicRow && basicRow.basicMealId
+    ? {
+        id: basicRow.id,
+        priceNaira: toCustomerDisplayPriceNaira(basicRow.priceNaira),
+        daysPerMonth: basicRow.daysPerMonth,
+        freeDays: basicRow.freeDays,
+        meal: toMealSummary(basicRow.basicMealId),
+      }
+    : null;
+
+  let premium = null;
+  if (premiumRow) {
+    const timetable = await db
+      .select()
+      .from(planTimetableTable)
+      .where(eq(planTimetableTable.planId, premiumRow.id))
+      .orderBy(asc(planTimetableTable.dayOfWeek));
+    const freeDayRows = timetable.filter((t) => t.isFreeDay);
+    // A Premium plan is only ever valid with exactly 4 rotation days + 1 free
+    // day. Never surface a partial/incomplete timetable to customers or the
+    // vendor dashboard — treat it as if Premium isn't set up rather than
+    // shipping a shape (e.g. missing freeDay) that callers assume is always
+    // present.
+    if (timetable.length === 5 && freeDayRows.length === 1) {
+      premium = {
+        id: premiumRow.id,
+        priceNaira: toCustomerDisplayPriceNaira(premiumRow.priceNaira),
+        daysPerMonth: premiumRow.daysPerMonth,
+        freeDays: premiumRow.freeDays,
+        rotation: timetable
+          .filter((t) => !t.isFreeDay)
+          .map((t) => ({ dayOfWeek: t.dayOfWeek, meal: toMealSummary(t.mealId) })),
+        freeDay: { dayOfWeek: freeDayRows[0].dayOfWeek, meal: toMealSummary(freeDayRows[0].mealId) },
+      };
+    }
+  }
+
+  return { basic, premium };
+}
+
 // GET /vendors/:vendorId
 router.get("/vendors/:vendorId", async (req, res) => {
   const vendorId = Number(req.params.vendorId);
@@ -69,10 +122,6 @@ router.get("/vendors/:vendorId", async (req, res) => {
     res.status(404).json({ error: "Vendor not found" });
     return;
   }
-  const plans = await db
-    .select()
-    .from(subscriptionPlansTable)
-    .where(eq(subscriptionPlansTable.vendorId, vendorId));
   const meals = await db
     .select()
     .from(mealsTable)
@@ -83,19 +132,7 @@ router.get("/vendors/:vendorId", async (req, res) => {
     .where(and(eq(subscriptionsTable.vendorId, vendorId), eq(subscriptionsTable.status, "active")));
 
   const mealsById = new Map(meals.map((m) => [m.id, m]));
-  const planIds = plans.map((p) => p.id);
-  const links = planIds.length > 0
-    ? await db
-        .select({ planId: planMealsTable.planId, mealId: planMealsTable.mealId })
-        .from(planMealsTable)
-        .where(inArray(planMealsTable.planId, planIds))
-    : [];
-  const mealIdsByPlan = new Map<number, number[]>();
-  for (const link of links) {
-    const list = mealIdsByPlan.get(link.planId) ?? [];
-    list.push(link.mealId);
-    mealIdsByPlan.set(link.planId, list);
-  }
+  const plans = await buildPublicPlans(vendorId, mealsById);
 
   res.json({
     id: vendor.id,
@@ -106,29 +143,13 @@ router.get("/vendors/:vendorId", async (req, res) => {
     rating: vendor.rating,
     subscriberCount: count,
     description: vendor.description ?? "",
-    plans: plans.map((p) => ({
-      id: p.id,
-      name: p.name,
-      daysPerMonth: p.daysPerMonth,
-      freeDays: p.freeDays,
-      priceNaira: toCustomerDisplayPriceNaira(p.priceNaira),
-      includesDelivery: p.includesDelivery,
-      menuItems: (mealIdsByPlan.get(p.id) ?? [])
-        .map((mealId) => mealsById.get(mealId))
-        .filter((m): m is typeof meals[number] => Boolean(m))
-        .map((m) => ({
-          id: m.id,
-          name: m.name,
-          description: m.description,
-          imageUrl: m.imageUrl,
-          category: m.category ?? null,
-        })),
-    })),
+    plans,
     meals: meals.map((m) => ({
       id: m.id,
       name: m.name,
       description: m.description,
       priceNaira: toCustomerDisplayPriceNaira(m.priceNaira),
+      offSchedulePriceNaira: computeOffSchedulePricing(m.priceNaira, vendor.offScheduleMarkupPercent).totalPriceNaira,
       imageUrl: m.imageUrl,
       available: m.available,
       category: m.category ?? null,
@@ -139,6 +160,7 @@ router.get("/vendors/:vendorId", async (req, res) => {
 // GET /vendors/:vendorId/meals
 router.get("/vendors/:vendorId/meals", async (req, res) => {
   const vendorId = Number(req.params.vendorId);
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
   const meals = await db
     .select()
     .from(mealsTable)
@@ -149,6 +171,7 @@ router.get("/vendors/:vendorId/meals", async (req, res) => {
       name: m.name,
       description: m.description,
       priceNaira: toCustomerDisplayPriceNaira(m.priceNaira),
+      offSchedulePriceNaira: computeOffSchedulePricing(m.priceNaira, vendor?.offScheduleMarkupPercent ?? null).totalPriceNaira,
       imageUrl: m.imageUrl,
       available: m.available,
       category: m.category ?? null,
@@ -159,20 +182,9 @@ router.get("/vendors/:vendorId/meals", async (req, res) => {
 // GET /vendors/:vendorId/plans
 router.get("/vendors/:vendorId/plans", async (req, res) => {
   const vendorId = Number(req.params.vendorId);
-  const plans = await db
-    .select()
-    .from(subscriptionPlansTable)
-    .where(eq(subscriptionPlansTable.vendorId, vendorId));
-  res.json(
-    plans.map((p) => ({
-      id: p.id,
-      name: p.name,
-      daysPerMonth: p.daysPerMonth,
-      freeDays: p.freeDays,
-      priceNaira: toCustomerDisplayPriceNaira(p.priceNaira),
-      includesDelivery: p.includesDelivery,
-    }))
-  );
+  const meals = await db.select().from(mealsTable).where(eq(mealsTable.vendorId, vendorId));
+  const mealsById = new Map(meals.map((m) => [m.id, m]));
+  res.json(await buildPublicPlans(vendorId, mealsById));
 });
 
 export default router;

@@ -6,10 +6,14 @@ import {
   useUpdateMeal,
   useDeleteMeal,
   useListMyPlans,
-  useSetPlanMeals,
+  useUpsertBasicPlan,
+  useUpsertPremiumPlan,
+  useDeleteVendorPlan,
   getListMyPlansQueryKey,
   Meal,
-  VendorPlanWithMeals,
+  VendorBasicPlan,
+  VendorPremiumPlan,
+  TimetableDayInput,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +25,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +51,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, UtensilsCrossed, ClipboardList } from "lucide-react";
+import { Plus, Pencil, Trash2, UtensilsCrossed, ClipboardList, Crown, Star } from "lucide-react";
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 type MealForm = {
   name: string;
@@ -264,143 +276,345 @@ export default function VendorMealsPage() {
   );
 }
 
+// Every pickup plan is one of exactly two fixed tiers — Basic (one fixed
+// meal) or Premium (a 4-day rotation plus one distinct free-day meal).
+// Both are pickup-only.
 function PlanMealsManager({ meals }: { meals: Meal[] }) {
+  const { data: plans, isLoading } = useListMyPlans();
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {[1, 2].map((i) => <Skeleton key={i} className="h-48 w-full" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <BasicPlanCard plan={plans?.basic ?? null} meals={meals} />
+      <PremiumPlanCard plan={plans?.premium ?? null} meals={meals} />
+    </div>
+  );
+}
+
+function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: Meal[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: plans, isLoading } = useListMyPlans();
-  const setPlanMeals = useSetPlanMeals();
+  const upsertBasic = useUpsertBasicPlan();
+  const deletePlan = useDeleteVendorPlan();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [priceNaira, setPriceNaira] = useState(plan ? String(plan.priceNaira) : "");
+  const [daysPerMonth, setDaysPerMonth] = useState(plan ? String(plan.daysPerMonth) : "12");
+  const [freeDays, setFreeDays] = useState(plan ? String(plan.freeDays) : "3");
+  const [mealId, setMealId] = useState<string>(plan?.mealId ? String(plan.mealId) : "");
 
-  const [editingPlan, setEditingPlan] = useState<VendorPlanWithMeals | null>(null);
-  const [selectedMealIds, setSelectedMealIds] = useState<number[]>([]);
+  const mealsById = new Map(meals.map((m) => [m.id, m]));
 
-  const openEdit = (plan: VendorPlanWithMeals) => {
-    setEditingPlan(plan);
-    setSelectedMealIds(plan.mealIds);
-  };
-
-  const toggleMeal = (mealId: number) => {
-    setSelectedMealIds((prev) =>
-      prev.includes(mealId) ? prev.filter((id) => id !== mealId) : [...prev, mealId]
-    );
+  const openEdit = () => {
+    setPriceNaira(plan ? String(plan.priceNaira) : "");
+    setDaysPerMonth(plan ? String(plan.daysPerMonth) : "12");
+    setFreeDays(plan ? String(plan.freeDays) : "3");
+    setMealId(plan?.mealId ? String(plan.mealId) : (meals[0] ? String(meals[0].id) : ""));
+    setDialogOpen(true);
   };
 
   const handleSave = () => {
-    if (!editingPlan) return;
-    setPlanMeals.mutate(
-      { planId: editingPlan.id, data: { mealIds: selectedMealIds } },
+    if (!mealId) {
+      toast({ title: "Choose the meal Basic customers will get", variant: "destructive" });
+      return;
+    }
+    upsertBasic.mutate(
+      { data: { priceNaira: Number(priceNaira) || 0, daysPerMonth: Number(daysPerMonth) || 0, freeDays: Number(freeDays) || 0, mealId: Number(mealId) } },
       {
         onSuccess: () => {
-          toast({ title: `${editingPlan.name} menu updated` });
+          toast({ title: "Basic plan saved" });
           queryClient.invalidateQueries({ queryKey: getListMyPlansQueryKey() });
-          setEditingPlan(null);
+          setDialogOpen(false);
         },
-        onError: () => toast({ title: "Failed to update plan menu", variant: "destructive" }),
+        onError: (err: any) => toast({ title: err?.error ?? "Failed to save Basic plan", variant: "destructive" }),
       }
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 w-full" />)}
-      </div>
+  const handleDelete = () => {
+    deletePlan.mutate(
+      { tier: "basic" },
+      {
+        onSuccess: () => {
+          toast({ title: "Basic plan removed" });
+          queryClient.invalidateQueries({ queryKey: getListMyPlansQueryKey() });
+        },
+        onError: (err: any) => toast({ title: err?.error ?? "Failed to remove Basic plan", variant: "destructive" }),
+      }
     );
-  }
-
-  if (!plans || plans.length === 0) {
-    return (
-      <div className="text-center py-16 bg-card rounded-xl border border-dashed border-border">
-        <ClipboardList className="w-10 h-10 mx-auto text-muted-foreground mb-3 opacity-50" />
-        <p className="text-muted-foreground">You don't have any plan tiers set up yet.</p>
-      </div>
-    );
-  }
-
-  const mealsById = new Map(meals.map((m) => [m.id, m]));
+  };
 
   return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {plans.map((plan) => (
-          <Card key={plan.id} className="border-border">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start gap-2">
-                <CardTitle className="text-lg font-serif">{plan.name}</CardTitle>
-                <Badge variant="secondary" className="font-mono text-[10px] shrink-0">
-                  {plan.mealIds.length} item{plan.mealIds.length === 1 ? "" : "s"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pb-2">
-              {plan.mealIds.length > 0 ? (
-                <ul className="text-sm text-muted-foreground space-y-1 mb-2">
-                  {plan.mealIds.slice(0, 3).map((id) => (
-                    <li key={id} className="truncate">• {mealsById.get(id)?.name ?? "Deleted meal"}</li>
-                  ))}
-                  {plan.mealIds.length > 3 && (
-                    <li className="text-xs italic">+{plan.mealIds.length - 3} more</li>
-                  )}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground italic mb-2">No meals assigned yet</p>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full font-mono"
-                onClick={() => openEdit(plan)}
-                data-testid={`button-edit-plan-menu-${plan.id}`}
-              >
-                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Menu
+    <Card className="border-border">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start gap-2">
+          <CardTitle className="text-lg font-serif flex items-center gap-2">
+            <Star className="w-4 h-4 text-primary" /> Basic
+          </CardTitle>
+          <Badge variant="secondary" className="font-mono text-[10px] shrink-0">Pickup only</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-2">
+        {plan ? (
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>₦{plan.priceNaira.toLocaleString("en-NG")} · {plan.daysPerMonth} days + {plan.freeDays} free</p>
+            <p>Meal: <span className="text-foreground">{mealsById.get(plan.mealId ?? -1)?.name ?? "Unknown"}</span></p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">Not set up yet. Offer a simple single-meal plan any customer can subscribe to.</p>
+        )}
+      </CardContent>
+      <CardFooter className="gap-2">
+        <Button variant="outline" size="sm" className="flex-1 font-mono" onClick={openEdit} data-testid="button-edit-basic-plan">
+          <Pencil className="w-3.5 h-3.5 mr-1" /> {plan ? "Edit" : "Set Up"}
+        </Button>
+        {plan && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="font-mono" data-testid="button-delete-basic-plan">
+                <Trash2 className="w-3.5 h-3.5" />
               </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-serif">Remove your Basic plan?</AlertDialogTitle>
+                <AlertDialogDescription>Blocked if any customer is actively subscribed to it.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="font-mono">Cancel</AlertDialogCancel>
+                <AlertDialogAction className="font-mono" onClick={handleDelete}>Yes, Remove</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </CardFooter>
 
-      <Dialog open={editingPlan !== null} onOpenChange={(open) => !open && setEditingPlan(null)}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif text-2xl">
-              {editingPlan?.name} — Included Meals
-            </DialogTitle>
+            <DialogTitle className="font-serif text-2xl">Basic Plan</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-            {meals.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">
-                Add meals to your menu first, then come back to assign them to this plan.
-              </p>
-            ) : (
-              meals.map((meal) => (
-                <label
-                  key={meal.id}
-                  className="flex items-center gap-3 p-2.5 rounded-md border border-border hover:bg-muted/50 cursor-pointer"
-                >
-                  <Checkbox
-                    checked={selectedMealIds.includes(meal.id)}
-                    onCheckedChange={() => toggleMeal(meal.id)}
-                    data-testid={`checkbox-plan-meal-${meal.id}`}
-                  />
-                  <span className="text-sm">{meal.name}</span>
-                </label>
-              ))
-            )}
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Price (₦)</Label>
+                <Input type="number" value={priceNaira} onChange={(e) => setPriceNaira(e.target.value)} data-testid="input-basic-price" />
+              </div>
+              <div className="space-y-2">
+                <Label>Days/month</Label>
+                <Input type="number" value={daysPerMonth} onChange={(e) => setDaysPerMonth(e.target.value)} data-testid="input-basic-days" />
+              </div>
+              <div className="space-y-2">
+                <Label>Free days</Label>
+                <Input type="number" value={freeDays} onChange={(e) => setFreeDays(e.target.value)} data-testid="input-basic-free-days" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Meal served every day</Label>
+              {meals.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">Add a meal to your menu first.</p>
+              ) : (
+                <Select value={mealId} onValueChange={setMealId}>
+                  <SelectTrigger data-testid="select-basic-meal"><SelectValue placeholder="Choose a meal" /></SelectTrigger>
+                  <SelectContent>
+                    {meals.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="font-mono" onClick={() => setEditingPlan(null)}>Cancel</Button>
-            <Button
-              className="font-mono"
-              onClick={handleSave}
-              disabled={setPlanMeals.isPending}
-              data-testid="button-save-plan-menu"
-            >
-              {setPlanMeals.isPending ? "Saving..." : "Save Menu"}
+            <Button variant="outline" className="font-mono" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button className="font-mono" onClick={handleSave} disabled={upsertBasic.isPending} data-testid="button-save-basic-plan">
+              {upsertBasic.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </Card>
+  );
+}
+
+type DaySlot = { type: "none" | "rotation" | "free"; mealId: string };
+
+function buildInitialSlots(plan: VendorPremiumPlan | null): DaySlot[] {
+  const slots: DaySlot[] = Array.from({ length: 7 }, () => ({ type: "none", mealId: "" }));
+  if (plan) {
+    for (const r of plan.rotation) slots[r.dayOfWeek] = { type: "rotation", mealId: String(r.mealId) };
+    slots[plan.freeDay.dayOfWeek] = { type: "free", mealId: String(plan.freeDay.mealId) };
+  }
+  return slots;
+}
+
+function PremiumPlanCard({ plan, meals }: { plan: VendorPremiumPlan | null; meals: Meal[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const upsertPremium = useUpsertPremiumPlan();
+  const deletePlan = useDeleteVendorPlan();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [priceNaira, setPriceNaira] = useState(plan ? String(plan.priceNaira) : "");
+  const [slots, setSlots] = useState<DaySlot[]>(() => buildInitialSlots(plan));
+
+  const eligible = meals.length >= 2;
+  const mealsById = new Map(meals.map((m) => [m.id, m]));
+
+  const openEdit = () => {
+    setPriceNaira(plan ? String(plan.priceNaira) : "");
+    setSlots(buildInitialSlots(plan));
+    setDialogOpen(true);
+  };
+
+  const setSlotType = (day: number, type: DaySlot["type"]) => {
+    setSlots((prev) => prev.map((s, i) => (i === day ? { type, mealId: type === "none" ? "" : (s.mealId || (meals[0] ? String(meals[0].id) : "")) } : s)));
+  };
+  const setSlotMeal = (day: number, mealId: string) => {
+    setSlots((prev) => prev.map((s, i) => (i === day ? { ...s, mealId } : s)));
+  };
+
+  const rotationCount = slots.filter((s) => s.type === "rotation").length;
+  const freeCount = slots.filter((s) => s.type === "free").length;
+
+  const handleSave = () => {
+    if (rotationCount !== 4 || freeCount !== 1) {
+      toast({ title: "Pick exactly 4 rotation days and 1 free day", variant: "destructive" });
+      return;
+    }
+    const rotation: TimetableDayInput[] = slots
+      .map((s, dayOfWeek) => ({ s, dayOfWeek }))
+      .filter(({ s }) => s.type === "rotation")
+      .map(({ s, dayOfWeek }) => ({ dayOfWeek, mealId: Number(s.mealId) }));
+    const freeDayIndex = slots.findIndex((s) => s.type === "free");
+    const freeDay: TimetableDayInput = { dayOfWeek: freeDayIndex, mealId: Number(slots[freeDayIndex].mealId) };
+
+    upsertPremium.mutate(
+      { data: { priceNaira: Number(priceNaira) || 0, rotation, freeDay } },
+      {
+        onSuccess: () => {
+          toast({ title: "Premium plan saved" });
+          queryClient.invalidateQueries({ queryKey: getListMyPlansQueryKey() });
+          setDialogOpen(false);
+        },
+        onError: (err: any) => toast({ title: err?.error ?? "Failed to save Premium plan", variant: "destructive" }),
+      }
+    );
+  };
+
+  const handleDelete = () => {
+    deletePlan.mutate(
+      { tier: "premium" },
+      {
+        onSuccess: () => {
+          toast({ title: "Premium plan removed" });
+          queryClient.invalidateQueries({ queryKey: getListMyPlansQueryKey() });
+        },
+        onError: (err: any) => toast({ title: err?.error ?? "Failed to remove Premium plan", variant: "destructive" }),
+      }
+    );
+  };
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start gap-2">
+          <CardTitle className="text-lg font-serif flex items-center gap-2">
+            <Crown className="w-4 h-4 text-primary" /> Premium
+          </CardTitle>
+          <Badge variant="secondary" className="font-mono text-[10px] shrink-0">Pickup only</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-2">
+        {!eligible ? (
+          <p className="text-sm text-muted-foreground italic">Add at least 2 menu items to unlock Premium (4-day rotation + free day).</p>
+        ) : plan ? (
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>₦{plan.priceNaira.toLocaleString("en-NG")} · {plan.daysPerMonth} days + {plan.freeDays} free / month</p>
+            <ul className="space-y-0.5">
+              {plan.rotation.map((r) => (
+                <li key={r.dayOfWeek}>{DAY_NAMES[r.dayOfWeek]}: <span className="text-foreground">{mealsById.get(r.mealId)?.name ?? "Unknown"}</span></li>
+              ))}
+              <li>{DAY_NAMES[plan.freeDay.dayOfWeek]} (free): <span className="text-foreground">{mealsById.get(plan.freeDay.mealId)?.name ?? "Unknown"}</span></li>
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">Not set up yet. Offer a weekly rotation with a bonus free-day meal.</p>
+        )}
+      </CardContent>
+      <CardFooter className="gap-2">
+        <Button variant="outline" size="sm" className="flex-1 font-mono" onClick={openEdit} disabled={!eligible} data-testid="button-edit-premium-plan">
+          <Pencil className="w-3.5 h-3.5 mr-1" /> {plan ? "Edit" : "Set Up"}
+        </Button>
+        {plan && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="font-mono" data-testid="button-delete-premium-plan">
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-serif">Remove your Premium plan?</AlertDialogTitle>
+                <AlertDialogDescription>Blocked if any customer is actively subscribed to it.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="font-mono">Cancel</AlertDialogCancel>
+                <AlertDialogAction className="font-mono" onClick={handleDelete}>Yes, Remove</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </CardFooter>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">Premium Plan</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+            <div className="space-y-2">
+              <Label>Price (₦/month)</Label>
+              <Input type="number" value={priceNaira} onChange={(e) => setPriceNaira(e.target.value)} data-testid="input-premium-price" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Choose exactly 4 rotation days and 1 free day ({rotationCount}/4 rotation, {freeCount}/1 free).</p>
+              {DAY_NAMES.map((name, day) => (
+                <div key={day} className="flex items-center gap-2 p-2 rounded-md border border-border">
+                  <span className="w-24 text-sm shrink-0">{name}</span>
+                  <Select value={slots[day].type} onValueChange={(v) => setSlotType(day, v as DaySlot["type"])}>
+                    <SelectTrigger className="w-32 shrink-0" data-testid={`select-day-type-${day}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Off</SelectItem>
+                      <SelectItem value="rotation">Rotation</SelectItem>
+                      <SelectItem value="free">Free day</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {slots[day].type !== "none" && (
+                    <Select value={slots[day].mealId} onValueChange={(v) => setSlotMeal(day, v)}>
+                      <SelectTrigger data-testid={`select-day-meal-${day}`}><SelectValue placeholder="Meal" /></SelectTrigger>
+                      <SelectContent>
+                        {meals.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="font-mono" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button className="font-mono" onClick={handleSave} disabled={upsertPremium.isPending} data-testid="button-save-premium-plan">
+              {upsertPremium.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

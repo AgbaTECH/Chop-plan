@@ -541,7 +541,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Meal"
+                  $ref: "#/components/schemas/PublicMeal"
 
   /vendors/{vendorId}/plans:
     get:
@@ -556,13 +556,11 @@ paths:
             type: integer
       responses:
         "200":
-          description: Subscription plans
+          description: Basic and/or Premium plan, each optional
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/SubscriptionPlan"
+                $ref: "#/components/schemas/PublicVendorPlans"
 
   /vendors/areas:
     get:
@@ -784,6 +782,94 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /user/alacarte/checkout:
+    post:
+      operationId: checkoutAlacarte
+      tags: [user]
+      summary: Start a Paystack checkout for an off-schedule, à la carte meal
+      description: >
+        No active subscription is required. Always priced from the meal's
+        raw vendor price at the (higher) off-schedule markup rate — the
+        server rejects the purchase if the customer already has a
+        subscription pickup scheduled at this vendor today.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlacarteCheckoutInput"
+      responses:
+        "201":
+          description: Checkout started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlacarteCheckoutResponse"
+        "400":
+          description: Validation error, or today is on-schedule at this vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Vendor or meal not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Paystack error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /user/alacarte/orders:
+    get:
+      operationId: listAlacarteOrders
+      tags: [user]
+      summary: Get the user's à la carte order history
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlacarteOrder"
+
+  /user/alacarte/{paymentId}/confirm:
+    post:
+      operationId: confirmAlacartePickup
+      tags: [user]
+      summary: Confirm an à la carte order's pickup was received
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlacarteOrderConfirmation"
+        "400":
+          description: Cannot confirm this order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── VENDOR dashboard ──────────────────────────────────────────────────────
   /vendor/profile:
     get:
@@ -860,41 +946,102 @@ paths:
     get:
       operationId: listMyPlans
       tags: [vendor]
-      summary: Get vendor's own plans with their assigned menu items
+      summary: Get vendor's own Basic and/or Premium plan
       responses:
         "200":
-          description: Plan list with meal assignments
+          description: The vendor's plans, each optional
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/VendorPlanWithMeals"
+                $ref: "#/components/schemas/VendorPlans"
 
-  /vendor/plans/{planId}/meals:
+  /vendor/plans/basic:
     put:
-      operationId: setPlanMeals
+      operationId: upsertBasicPlan
       tags: [vendor]
-      summary: Set the menu items included in a plan tier
-      parameters:
-        - name: planId
-          in: path
-          required: true
-          schema:
-            type: integer
+      summary: Create or update the vendor's Basic plan
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SetPlanMealsInput"
+              $ref: "#/components/schemas/UpsertBasicPlanInput"
       responses:
         "200":
-          description: Updated plan meal assignment
+          description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PlanMealsResult"
+                $ref: "#/components/schemas/VendorBasicPlan"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorBasicPlan"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /vendor/plans/premium:
+    put:
+      operationId: upsertPremiumPlan
+      tags: [vendor]
+      summary: Create or update the vendor's Premium plan (4-day rotation + 1 free day)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertPremiumPlanInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorPremiumPlan"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorPremiumPlan"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /vendor/plans/{tier}:
+    delete:
+      operationId: deleteVendorPlan
+      tags: [vendor]
+      summary: Remove the vendor's Basic or Premium plan
+      parameters:
+        - name: tier
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [basic, premium]
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Cannot remove a plan with active subscribers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Plan not found
           content:
@@ -1208,6 +1355,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/revenue/off-schedule:
+    get:
+      operationId: getOffScheduleRevenue
+      tags: [admin]
+      summary: Off-schedule (à la carte) markup revenue, reported separately from subscription revenue
+      responses:
+        "200":
+          description: Off-schedule revenue summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OffScheduleRevenue"
 
   /admin/leads:
     get:
@@ -1542,34 +1702,37 @@ components:
         description:
           type: string
         plans:
-          type: array
-          items:
-            $ref: "#/components/schemas/SubscriptionPlan"
+          $ref: "#/components/schemas/PublicVendorPlans"
         meals:
           type: array
           items:
-            $ref: "#/components/schemas/Meal"
+            $ref: "#/components/schemas/PublicMeal"
 
-    SubscriptionPlan:
+    PublicMeal:
       type: object
-      required: [id, name, daysPerMonth, freeDays, priceNaira, includesDelivery]
+      required: [id, name, description, priceNaira, offSchedulePriceNaira, imageUrl, available]
       properties:
         id:
           type: integer
         name:
           type: string
-        daysPerMonth:
-          type: integer
-        freeDays:
-          type: integer
+        description:
+          type: string
         priceNaira:
           type: integer
-        includesDelivery:
+        offSchedulePriceNaira:
+          type: integer
+          description: >
+            The higher, off-schedule ("à la carte") price for buying this
+            meal directly with no active subscription, on a day outside the
+            customer's plan schedule. Always strictly greater than
+            priceNaira.
+        imageUrl:
+          type: string
+        available:
           type: boolean
-        menuItems:
-          type: array
-          items:
-            $ref: "#/components/schemas/PlanMenuItem"
+        category:
+          type: ["string", "null"]
 
     PlanMenuItem:
       type: object
@@ -1586,46 +1749,147 @@ components:
         category:
           type: ["string", "null"]
 
-    VendorPlanWithMeals:
+    # ── Public (pre-subscription) plan shapes ──────────────────────────────
+    PublicBasicPlan:
       type: object
-      required: [id, name, daysPerMonth, freeDays, priceNaira, includesDelivery, mealIds]
+      required: [id, priceNaira, daysPerMonth, freeDays, meal]
       properties:
         id:
           type: integer
-        name:
-          type: string
+        priceNaira:
+          type: integer
         daysPerMonth:
           type: integer
         freeDays:
           type: integer
+        meal:
+          $ref: "#/components/schemas/PlanMenuItem"
+
+    PublicTimetableDay:
+      type: object
+      required: [dayOfWeek, meal]
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        meal:
+          $ref: "#/components/schemas/PlanMenuItem"
+
+    PublicPremiumPlan:
+      type: object
+      required: [id, priceNaira, daysPerMonth, freeDays, rotation, freeDay]
+      properties:
+        id:
+          type: integer
         priceNaira:
           type: integer
-        includesDelivery:
-          type: boolean
-        mealIds:
-          type: array
-          items:
-            type: integer
-
-    SetPlanMealsInput:
-      type: object
-      required: [mealIds]
-      properties:
-        mealIds:
-          type: array
-          items:
-            type: integer
-
-    PlanMealsResult:
-      type: object
-      required: [planId, mealIds]
-      properties:
-        planId:
+        daysPerMonth:
           type: integer
-        mealIds:
+        freeDays:
+          type: integer
+        rotation:
           type: array
           items:
-            type: integer
+            $ref: "#/components/schemas/PublicTimetableDay"
+        freeDay:
+          $ref: "#/components/schemas/PublicTimetableDay"
+
+    PublicVendorPlans:
+      type: object
+      properties:
+        basic:
+          oneOf:
+            - $ref: "#/components/schemas/PublicBasicPlan"
+            - type: "null"
+        premium:
+          oneOf:
+            - $ref: "#/components/schemas/PublicPremiumPlan"
+            - type: "null"
+
+    # ── Vendor-dashboard plan shapes ────────────────────────────────────────
+    VendorBasicPlan:
+      type: object
+      required: [id, priceNaira, daysPerMonth, freeDays, mealId]
+      properties:
+        id:
+          type: integer
+        priceNaira:
+          type: integer
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        mealId:
+          type: ["integer", "null"]
+
+    TimetableDayInput:
+      type: object
+      required: [dayOfWeek, mealId]
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        mealId:
+          type: integer
+
+    VendorPremiumPlan:
+      type: object
+      required: [id, priceNaira, daysPerMonth, freeDays, rotation, freeDay]
+      properties:
+        id:
+          type: integer
+        priceNaira:
+          type: integer
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        rotation:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimetableDayInput"
+        freeDay:
+          $ref: "#/components/schemas/TimetableDayInput"
+
+    VendorPlans:
+      type: object
+      properties:
+        basic:
+          oneOf:
+            - $ref: "#/components/schemas/VendorBasicPlan"
+            - type: "null"
+        premium:
+          oneOf:
+            - $ref: "#/components/schemas/VendorPremiumPlan"
+            - type: "null"
+
+    UpsertBasicPlanInput:
+      type: object
+      required: [priceNaira, daysPerMonth, freeDays, mealId]
+      properties:
+        priceNaira:
+          type: integer
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        mealId:
+          type: integer
+
+    UpsertPremiumPlanInput:
+      type: object
+      required: [priceNaira, rotation, freeDay]
+      properties:
+        priceNaira:
+          type: integer
+        rotation:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimetableDayInput"
+        freeDay:
+          $ref: "#/components/schemas/TimetableDayInput"
 
     Meal:
       type: object
@@ -1724,15 +1988,93 @@ components:
 
     PaymentStatus:
       type: object
-      required: [status, subscriptionId, message]
+      required: [status, subscriptionId, orderType, paymentId, message]
       properties:
         status:
           type: string
           enum: [pending, success, failed]
         subscriptionId:
           type: ["integer", "null"]
+        orderType:
+          type: string
+          enum: [subscription, alacarte]
+        paymentId:
+          type: integer
         message:
           type: ["string", "null"]
+
+    AlacarteCheckoutInput:
+      type: object
+      required: [vendorId, mealId, callbackUrl]
+      properties:
+        vendorId:
+          type: integer
+        mealId:
+          type: integer
+        callbackUrl:
+          type: string
+          description: Where Paystack should redirect the customer after checkout
+
+    AlacarteCheckoutResponse:
+      type: object
+      required: [reference, authorizationUrl, amountNaira]
+      properties:
+        reference:
+          type: string
+        authorizationUrl:
+          type: string
+        amountNaira:
+          type: integer
+
+    AlacarteOrder:
+      type: object
+      required: [id, vendorId, vendorName, mealId, mealName, orderDate, amountNaira, status, pickupStatus, pickupConfirmedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        mealId:
+          type: ["integer", "null"]
+        mealName:
+          type: ["string", "null"]
+        orderDate:
+          type: ["string", "null"]
+          format: date
+        amountNaira:
+          type: integer
+        status:
+          type: string
+          enum: [pending, success, failed]
+        pickupStatus:
+          type: ["string", "null"]
+          enum: [pending, confirmed, null]
+        pickupConfirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    AlacarteOrderConfirmation:
+      type: object
+      required: [id, orderDate, amountNaira, pickupStatus, pickupConfirmedAt]
+      properties:
+        id:
+          type: integer
+        orderDate:
+          type: ["string", "null"]
+          format: date
+        amountNaira:
+          type: integer
+        pickupStatus:
+          type: string
+          enum: [pending, confirmed]
+        pickupConfirmedAt:
+          type: ["string", "null"]
+          format: date-time
 
     # ── Vendor dashboard ──────────────────────────────────────────────────
     VendorProfile:
@@ -1842,6 +2184,15 @@ components:
           items:
             $ref: "#/components/schemas/PlanBreakdown"
 
+    OffScheduleRevenue:
+      type: object
+      required: [orderCount, totalOffScheduleMarkupNaira]
+      properties:
+        orderCount:
+          type: integer
+        totalOffScheduleMarkupNaira:
+          type: integer
+
     MealInput:
       type: object
       required: [name, description, priceNaira, imageUrl]
@@ -1878,7 +2229,7 @@ components:
     # ── Order tracking & wallet ─────────────────────────────────────────────
     ScheduleDay:
       type: object
-      required: [id, dayNumber, scheduledDate, status, confirmedAt]
+      required: [id, dayNumber, scheduledDate, status, confirmedAt, isFreeDay, mealName]
       properties:
         id:
           type: integer
@@ -1893,6 +2244,10 @@ components:
         confirmedAt:
           type: ["string", "null"]
           format: date-time
+        isFreeDay:
+          type: boolean
+        mealName:
+          type: ["string", "null"]
 
     WalletWithdrawal:
       type: object
