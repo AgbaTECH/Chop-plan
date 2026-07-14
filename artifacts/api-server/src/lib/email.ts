@@ -16,7 +16,7 @@ export async function sendEmail({ to, subject, html }: SendEmailArgs): Promise<v
   const response = await connectors.proxy("resend", "/emails", {
     method: "POST",
     body: {
-      from: "Chop Plan <onboarding@resend.dev>",
+      from: "Chop Plan <updates@updates.chopplan.ng>",
       to: [to],
       subject,
       html,
