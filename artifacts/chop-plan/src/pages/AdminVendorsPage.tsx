@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { AdminLayout } from "@/components/AdminLayout";
 import { useListAdminVendors, useCreateAdminVendor, useDeleteAdminVendor, getListAdminVendorsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Eye } from "lucide-react";
 
 const vendorSchema = z.object({
   businessName: z.string().min(2),
@@ -138,6 +139,11 @@ export default function AdminVendorsPage() {
                     <TableCell>{v.cuisineType}</TableCell>
                     <TableCell className="font-mono">{v.subscriberCount}</TableCell>
                     <TableCell className="text-right">
+                      <Link href={`/admin/vendors/${v.id}`}>
+                        <Button variant="ghost" size="icon" data-testid={`button-view-vendor-${v.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </Link>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(v.id)} data-testid={`button-delete-vendor-${v.id}`}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>

@@ -28,8 +28,12 @@ import VendorKitchenProfilePage from './pages/VendorKitchenProfilePage';
 import VendorWalletPage from './pages/VendorWalletPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminVendorsPage from './pages/AdminVendorsPage';
+import AdminVendorDetailPage from './pages/AdminVendorDetailPage';
 import AdminCustomersPage from './pages/AdminCustomersPage';
 import AdminLeadsPage from './pages/AdminLeadsPage';
+import AdminTransactionsPage from './pages/AdminTransactionsPage';
+import AdminWithdrawalsPage from './pages/AdminWithdrawalsPage';
+import AdminNotificationsPage from './pages/AdminNotificationsPage';
 import PromoFlyerPage from './pages/PromoFlyerPage';
 
 const queryClient = new QueryClient();
@@ -71,7 +75,11 @@ function Router() {
 
           <Route path="/admin/dashboard" component={AdminDashboardPage} />
           <Route path="/admin/vendors" component={AdminVendorsPage} />
+          <Route path="/admin/vendors/:id" component={AdminVendorDetailPage} />
           <Route path="/admin/customers" component={AdminCustomersPage} />
+          <Route path="/admin/transactions" component={AdminTransactionsPage} />
+          <Route path="/admin/withdrawals" component={AdminWithdrawalsPage} />
+          <Route path="/admin/notifications" component={AdminNotificationsPage} />
           <Route path="/admin/leads" component={AdminLeadsPage} />
 
           <Route path="/get-started" component={PromoFlyerPage} />

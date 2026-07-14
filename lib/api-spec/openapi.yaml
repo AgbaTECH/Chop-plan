@@ -1651,6 +1651,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /admin/vendors/{vendorId}/detail:
+    get:
+      operationId: getAdminVendorDetail
+      tags: [admin]
+      summary: Full vendor detail — kitchen profile, plan tiers, timetable, bank account
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVendorDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/transactions:
+    get:
+      operationId: listAdminTransactions
+      tags: [admin]
+      summary: List subscription payments and off-schedule purchases, with vendor payout / markup split
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminTransaction"
+
+  /admin/withdrawals:
+    get:
+      operationId: listAdminWithdrawals
+      tags: [admin]
+      summary: List all vendor withdrawals with status
+      responses:
+        "200":
+          description: Withdrawals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminWithdrawal"
+
+  /admin/notifications:
+    get:
+      operationId: listAdminNotifications
+      tags: [admin]
+      summary: List recent vendor-to-customer pickup notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminNotification"
+
   # ── BLOG ─────────────────────────────────────────────────────────────────
   /blog/posts:
     get:
@@ -2790,6 +2860,191 @@ components:
           type: string
         area:
           type: string
+
+    AdminVendorPlan:
+      type: object
+      required: [id, tier, priceNaira, daysPerMonth, freeDays, mealCount]
+      properties:
+        id:
+          type: integer
+        tier:
+          type: string
+          enum: [basic, premium]
+        priceNaira:
+          type: integer
+        daysPerMonth:
+          type: integer
+        freeDays:
+          type: integer
+        mealCount:
+          type: integer
+          description: Basic — 1 (single fixed meal). Premium — number of distinct meals across the timetable.
+        basicMealName:
+          type: ["string", "null"]
+          description: Basic tier only — the single fixed meal name.
+        timetable:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPlanTimetableEntry"
+
+    AdminPlanTimetableEntry:
+      type: object
+      required: [dayOfWeek, mealName, isFreeDay]
+      properties:
+        dayOfWeek:
+          type: integer
+        mealName:
+          type: string
+        isFreeDay:
+          type: boolean
+
+    AdminVendorDetail:
+      type: object
+      required:
+        [
+          id,
+          businessName,
+          ownerName,
+          email,
+          phone,
+          area,
+          cuisineType,
+          description,
+          coverImage,
+          kitchenPhotos,
+          verified,
+          rating,
+          offScheduleMarkupPercent,
+          subscriberCount,
+          plans,
+          bankAccount,
+        ]
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        ownerName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        area:
+          type: string
+        cuisineType:
+          type: string
+        description:
+          type: ["string", "null"]
+        coverImage:
+          type: ["string", "null"]
+        kitchenPhotos:
+          type: array
+          items:
+            type: string
+        verified:
+          type: boolean
+        rating:
+          type: number
+        offScheduleMarkupPercent:
+          type: ["integer", "null"]
+        subscriberCount:
+          type: integer
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorPlan"
+        bankAccount:
+          oneOf:
+            - $ref: "#/components/schemas/VendorBankAccount"
+            - type: "null"
+
+    AdminTransaction:
+      type: object
+      required:
+        [
+          id,
+          orderType,
+          vendorName,
+          customerName,
+          amountNaira,
+          vendorPayoutNaira,
+          markupNaira,
+          status,
+          reference,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: integer
+        orderType:
+          type: string
+          enum: [subscription, alacarte]
+        vendorName:
+          type: string
+        customerName:
+          type: string
+        amountNaira:
+          type: integer
+        vendorPayoutNaira:
+          type: integer
+        markupNaira:
+          type: integer
+          description: ChopPlan's cut — flat 5% for subscriptions (computed on the fly, never persisted), or the persisted off-schedule markup for à la carte orders.
+        status:
+          type: string
+          enum: [pending, success, failed]
+        reference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminWithdrawal:
+      type: object
+      required: [id, vendorName, amountNaira, status, bankName, accountNumber, accountName, failureReason, createdAt]
+      properties:
+        id:
+          type: integer
+        vendorName:
+          type: string
+        amountNaira:
+          type: integer
+        status:
+          type: string
+          enum: [pending, success, failed]
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        accountName:
+          type: string
+        failureReason:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminNotification:
+      type: object
+      required: [id, vendorName, customerName, orderType, presetType, message, createdAt]
+      properties:
+        id:
+          type: integer
+        vendorName:
+          type: string
+        customerName:
+          type: string
+        orderType:
+          type: string
+          enum: [subscription, alacarte]
+        presetType:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
     # ── Blog ─────────────────────────────────────────────────────────────
     BlogPost:

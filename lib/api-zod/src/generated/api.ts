@@ -1310,6 +1310,102 @@ export const DeleteAdminCustomerResponse = zod.object({
 
 
 /**
+ * @summary Full vendor detail — kitchen profile, plan tiers, timetable, bank account
+ */
+export const GetAdminVendorDetailParams = zod.object({
+  "vendorId": zod.coerce.number()
+})
+
+export const GetAdminVendorDetailResponse = zod.object({
+  "id": zod.number(),
+  "businessName": zod.string(),
+  "ownerName": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "area": zod.string(),
+  "cuisineType": zod.string(),
+  "description": zod.string().nullable(),
+  "coverImage": zod.string().nullable(),
+  "kitchenPhotos": zod.array(zod.string()),
+  "verified": zod.boolean(),
+  "rating": zod.number(),
+  "offScheduleMarkupPercent": zod.number().nullable(),
+  "subscriberCount": zod.number(),
+  "plans": zod.array(zod.object({
+  "id": zod.number(),
+  "tier": zod.enum(['basic', 'premium']),
+  "priceNaira": zod.number(),
+  "daysPerMonth": zod.number(),
+  "freeDays": zod.number(),
+  "mealCount": zod.number().describe('Basic — 1 (single fixed meal). Premium — number of distinct meals across the timetable.'),
+  "basicMealName": zod.string().nullish().describe('Basic tier only — the single fixed meal name.'),
+  "timetable": zod.array(zod.object({
+  "dayOfWeek": zod.number(),
+  "mealName": zod.string(),
+  "isFreeDay": zod.boolean()
+})).optional()
+})),
+  "bankAccount": zod.union([zod.object({
+  "bankCode": zod.string(),
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "accountName": zod.string(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()])
+})
+
+
+/**
+ * @summary List subscription payments and off-schedule purchases, with vendor payout / markup split
+ */
+export const ListAdminTransactionsResponseItem = zod.object({
+  "id": zod.number(),
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "vendorName": zod.string(),
+  "customerName": zod.string(),
+  "amountNaira": zod.number(),
+  "vendorPayoutNaira": zod.number(),
+  "markupNaira": zod.number().describe('ChopPlan\'s cut — flat 5% for subscriptions (computed on the fly, never persisted), or the persisted off-schedule markup for à la carte orders.'),
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "reference": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminTransactionsResponse = zod.array(ListAdminTransactionsResponseItem)
+
+
+/**
+ * @summary List all vendor withdrawals with status
+ */
+export const ListAdminWithdrawalsResponseItem = zod.object({
+  "id": zod.number(),
+  "vendorName": zod.string(),
+  "amountNaira": zod.number(),
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "accountName": zod.string(),
+  "failureReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminWithdrawalsResponse = zod.array(ListAdminWithdrawalsResponseItem)
+
+
+/**
+ * @summary List recent vendor-to-customer pickup notifications
+ */
+export const ListAdminNotificationsResponseItem = zod.object({
+  "id": zod.number(),
+  "vendorName": zod.string(),
+  "customerName": zod.string(),
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "presetType": zod.string(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminNotificationsResponse = zod.array(ListAdminNotificationsResponseItem)
+
+
+/**
  * @summary List published blog posts
  */
 export const ListBlogPostsResponseItem = zod.object({

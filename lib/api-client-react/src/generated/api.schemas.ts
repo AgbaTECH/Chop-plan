@@ -734,6 +734,129 @@ export interface AdminCustomerInput {
   area: string;
 }
 
+export type AdminVendorPlanTier = typeof AdminVendorPlanTier[keyof typeof AdminVendorPlanTier];
+
+
+export const AdminVendorPlanTier = {
+  basic: 'basic',
+  premium: 'premium',
+} as const;
+
+export interface AdminPlanTimetableEntry {
+  dayOfWeek: number;
+  mealName: string;
+  isFreeDay: boolean;
+}
+
+export interface AdminVendorPlan {
+  id: number;
+  tier: AdminVendorPlanTier;
+  priceNaira: number;
+  daysPerMonth: number;
+  freeDays: number;
+  /** Basic — 1 (single fixed meal). Premium — number of distinct meals across the timetable. */
+  mealCount: number;
+  /**
+     * Basic tier only — the single fixed meal name.
+     * @nullable
+     */
+  basicMealName?: string | null;
+  timetable?: AdminPlanTimetableEntry[];
+}
+
+export interface AdminVendorDetail {
+  id: number;
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  area: string;
+  cuisineType: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  coverImage: string | null;
+  kitchenPhotos: string[];
+  verified: boolean;
+  rating: number;
+  /** @nullable */
+  offScheduleMarkupPercent: number | null;
+  subscriberCount: number;
+  plans: AdminVendorPlan[];
+  bankAccount: VendorBankAccount | null;
+}
+
+export type AdminTransactionOrderType = typeof AdminTransactionOrderType[keyof typeof AdminTransactionOrderType];
+
+
+export const AdminTransactionOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
+
+export type AdminTransactionStatus = typeof AdminTransactionStatus[keyof typeof AdminTransactionStatus];
+
+
+export const AdminTransactionStatus = {
+  pending: 'pending',
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+export interface AdminTransaction {
+  id: number;
+  orderType: AdminTransactionOrderType;
+  vendorName: string;
+  customerName: string;
+  amountNaira: number;
+  vendorPayoutNaira: number;
+  /** ChopPlan's cut — flat 5% for subscriptions (computed on the fly, never persisted), or the persisted off-schedule markup for à la carte orders. */
+  markupNaira: number;
+  status: AdminTransactionStatus;
+  reference: string;
+  createdAt: string;
+}
+
+export type AdminWithdrawalStatus = typeof AdminWithdrawalStatus[keyof typeof AdminWithdrawalStatus];
+
+
+export const AdminWithdrawalStatus = {
+  pending: 'pending',
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+export interface AdminWithdrawal {
+  id: number;
+  vendorName: string;
+  amountNaira: number;
+  status: AdminWithdrawalStatus;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  /** @nullable */
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export type AdminNotificationOrderType = typeof AdminNotificationOrderType[keyof typeof AdminNotificationOrderType];
+
+
+export const AdminNotificationOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
+
+export interface AdminNotification {
+  id: number;
+  vendorName: string;
+  customerName: string;
+  orderType: AdminNotificationOrderType;
+  presetType: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface BlogPost {
   id: number;
   title: string;

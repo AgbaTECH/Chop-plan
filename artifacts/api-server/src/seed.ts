@@ -10,7 +10,7 @@ import {
 } from "./lib/schedule";
 import { hashPassword } from "./lib/sessions";
 
-const BASE = "/chop-plan/images";
+const BASE = "/images";
 
 async function seed() {
   console.log("Seeding database…");

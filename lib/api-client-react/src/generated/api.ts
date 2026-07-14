@@ -23,9 +23,13 @@ import type {
   AdminCustomer,
   AdminCustomerInput,
   AdminLead,
+  AdminNotification,
   AdminStats,
+  AdminTransaction,
   AdminVendor,
+  AdminVendorDetail,
   AdminVendorInput,
+  AdminWithdrawal,
   AlacarteCheckoutInput,
   AlacarteCheckoutResponse,
   AlacarteOrder,
@@ -5096,6 +5100,314 @@ export const useDeleteAdminCustomer = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteAdminCustomerMutationOptions(options));
     }
+
+export const getGetAdminVendorDetailUrl = (vendorId: number,) => {
+
+
+
+
+  return `/api/admin/vendors/${vendorId}/detail`
+}
+
+/**
+ * @summary Full vendor detail — kitchen profile, plan tiers, timetable, bank account
+ */
+export const getAdminVendorDetail = async (vendorId: number, options?: RequestInit): Promise<AdminVendorDetail> => {
+
+  return customFetch<AdminVendorDetail>(getGetAdminVendorDetailUrl(vendorId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVendorDetailQueryKey = (vendorId: number,) => {
+    return [
+    `/api/admin/vendors/${vendorId}/detail`
+    ] as const;
+    }
+
+
+export const getGetAdminVendorDetailQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVendorDetail>>, TError = ErrorType<ErrorResponse>>(vendorId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVendorDetailQueryKey(vendorId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVendorDetail>>> = ({ signal }) => getAdminVendorDetail(vendorId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: vendorId !== null && vendorId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminVendorDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVendorDetail>>>
+export type GetAdminVendorDetailQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Full vendor detail — kitchen profile, plan tiers, timetable, bank account
+ */
+
+export function useGetAdminVendorDetail<TData = Awaited<ReturnType<typeof getAdminVendorDetail>>, TError = ErrorType<ErrorResponse>>(
+ vendorId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminVendorDetailQueryOptions(vendorId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAdminTransactionsUrl = () => {
+
+
+
+
+  return `/api/admin/transactions`
+}
+
+/**
+ * @summary List subscription payments and off-schedule purchases, with vendor payout / markup split
+ */
+export const listAdminTransactions = async ( options?: RequestInit): Promise<AdminTransaction[]> => {
+
+  return customFetch<AdminTransaction[]>(getListAdminTransactionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminTransactionsQueryKey = () => {
+    return [
+    `/api/admin/transactions`
+    ] as const;
+    }
+
+
+export const getListAdminTransactionsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminTransactions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminTransactionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminTransactions>>> = ({ signal }) => listAdminTransactions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminTransactions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminTransactionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminTransactions>>>
+export type ListAdminTransactionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List subscription payments and off-schedule purchases, with vendor payout / markup split
+ */
+
+export function useListAdminTransactions<TData = Awaited<ReturnType<typeof listAdminTransactions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminTransactionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAdminWithdrawalsUrl = () => {
+
+
+
+
+  return `/api/admin/withdrawals`
+}
+
+/**
+ * @summary List all vendor withdrawals with status
+ */
+export const listAdminWithdrawals = async ( options?: RequestInit): Promise<AdminWithdrawal[]> => {
+
+  return customFetch<AdminWithdrawal[]>(getListAdminWithdrawalsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminWithdrawalsQueryKey = () => {
+    return [
+    `/api/admin/withdrawals`
+    ] as const;
+    }
+
+
+export const getListAdminWithdrawalsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminWithdrawals>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminWithdrawals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminWithdrawalsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminWithdrawals>>> = ({ signal }) => listAdminWithdrawals({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminWithdrawals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminWithdrawalsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminWithdrawals>>>
+export type ListAdminWithdrawalsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all vendor withdrawals with status
+ */
+
+export function useListAdminWithdrawals<TData = Awaited<ReturnType<typeof listAdminWithdrawals>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminWithdrawals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminWithdrawalsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAdminNotificationsUrl = () => {
+
+
+
+
+  return `/api/admin/notifications`
+}
+
+/**
+ * @summary List recent vendor-to-customer pickup notifications
+ */
+export const listAdminNotifications = async ( options?: RequestInit): Promise<AdminNotification[]> => {
+
+  return customFetch<AdminNotification[]>(getListAdminNotificationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminNotificationsQueryKey = () => {
+    return [
+    `/api/admin/notifications`
+    ] as const;
+    }
+
+
+export const getListAdminNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminNotificationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminNotifications>>> = ({ signal }) => listAdminNotifications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminNotifications>>>
+export type ListAdminNotificationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent vendor-to-customer pickup notifications
+ */
+
+export function useListAdminNotifications<TData = Awaited<ReturnType<typeof listAdminNotifications>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminNotificationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListBlogPostsUrl = () => {
 

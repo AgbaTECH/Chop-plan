@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Store, Users, UserPlus } from "lucide-react";
+import { LayoutDashboard, Store, Users, UserPlus, Receipt, Landmark, Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface AdminLayoutProps {
@@ -31,6 +31,9 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
     { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard },
     { href: "/admin/vendors", label: "Vendors", icon: Store },
     { href: "/admin/customers", label: "Customers", icon: Users },
+    { href: "/admin/transactions", label: "Transactions", icon: Receipt },
+    { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
+    { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/leads", label: "Leads", icon: UserPlus },
   ];
 
