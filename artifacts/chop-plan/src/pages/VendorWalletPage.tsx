@@ -8,6 +8,7 @@ import {
   useSetVendorBankAccount,
   getGetVendorWalletQueryKey,
   getGetVendorBankAccountQueryKey,
+  getListPaystackBanksQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { BankSearchCombobox } from "@/components/BankSearchCombobox";
 import { useToast } from "@/hooks/use-toast";
 import { Wallet, PiggyBank, ArrowDownToLine, Landmark, ShieldCheck, Pencil } from "lucide-react";
 import { format } from "date-fns";
@@ -183,7 +184,11 @@ function BankAccountCard({
   onSaved: () => void;
 }) {
   const { toast } = useToast();
-  const { data: banks, isLoading: banksLoading } = useListPaystackBanks();
+  // Bank list rarely changes; keep it cached for the whole session instead of
+  // refetching every time this card mounts (e.g. re-opening "Change").
+  const { data: banks, isLoading: banksLoading } = useListPaystackBanks({
+    query: { staleTime: Infinity, gcTime: Infinity, queryKey: getListPaystackBanksQueryKey() },
+  });
   const setBankAccount = useSetVendorBankAccount();
 
   const [editing, setEditing] = useState(false);
@@ -252,16 +257,12 @@ function BankAccountCard({
           <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
             <div className="space-y-2 w-full sm:w-64">
               <Label>Bank</Label>
-              <Select value={bankCode} onValueChange={setBankCode} disabled={banksLoading}>
-                <SelectTrigger data-testid="select-bank">
-                  <SelectValue placeholder={banksLoading ? "Loading banks..." : "Select your bank"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {banks?.map((b) => (
-                    <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <BankSearchCombobox
+                banks={banks ?? []}
+                value={bankCode}
+                onChange={setBankCode}
+                loading={banksLoading}
+              />
             </div>
             <div className="space-y-2 w-full sm:w-56">
               <Label htmlFor="accountNumber">Account Number</Label>
