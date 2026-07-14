@@ -16,7 +16,7 @@ import {
 import { eq, and, sql, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { perDayShareNaira, PREMIUM_DAYS_PER_MONTH, PREMIUM_FREE_DAYS } from "../lib/schedule";
-import { listBanks, resolveAccountNumber, createTransferRecipient, initiateTransfer, PaystackError } from "../lib/paystack";
+import { listBanks, resolveAccountNumber, createTransferRecipient, initiateTransfer, PaystackError, isPayoutRestrictionError, PAYOUT_RESTRICTED_VENDOR_MESSAGE } from "../lib/paystack";
 import { logger } from "../lib/logger";
 import { PRESET_TYPES, PresetType, resolveNotificationMessage } from "../lib/notifications";
 import { withdrawalRateLimit } from "../lib/rate-limit";
@@ -78,13 +78,44 @@ router.patch("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, 
   });
 });
 
+// A subscription's `status` column only ever flips to "cancelled" — nothing
+// currently marks a subscription "expired"/"completed" once every prepaid
+// day in its block has been confirmed. Left unchecked, a subscriber whose
+// 4-day (or 12/25-day) block ran out weeks ago would count as "active"
+// forever and permanently inflate projected earnings for a customer who
+// isn't actually being fed anymore. So "currently active" for projection
+// purposes means: status = 'active' AND at least one not-yet-confirmed
+// ("pending") day remains on their schedule — i.e. they still have an
+// active prepaid day-block, not just a row that was never cancelled.
+async function getCurrentlyFeedingSubscriptions(vendorId: number) {
+  const subs = await db
+    .select({ id: subscriptionsTable.id, status: subscriptionsTable.status, planId: subscriptionsTable.planId })
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.vendorId, vendorId));
+
+  const activeSubs = subs.filter((s) => s.status === "active");
+  const activeSubIds = activeSubs.map((s) => s.id);
+
+  let idsWithRemainingDays = new Set<number>();
+  if (activeSubIds.length > 0) {
+    const remaining = await db
+      .select({ subscriptionId: subscriptionDaysTable.subscriptionId })
+      .from(subscriptionDaysTable)
+      .where(and(inArray(subscriptionDaysTable.subscriptionId, activeSubIds), eq(subscriptionDaysTable.status, "pending")))
+      .groupBy(subscriptionDaysTable.subscriptionId);
+    idsWithRemainingDays = new Set(remaining.map((r) => r.subscriptionId));
+  }
+
+  return {
+    totalSubscriberCount: subs.length,
+    feedingSubs: activeSubs.filter((s) => idsWithRemainingDays.has(s.id)),
+  };
+}
+
 // GET /vendor/dashboard
 router.get("/vendor/dashboard", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
-  const subs = await db
-    .select({ status: subscriptionsTable.status, planId: subscriptionsTable.planId })
-    .from(subscriptionsTable)
-    .where(eq(subscriptionsTable.vendorId, vendorId));
+  const { totalSubscriberCount, feedingSubs } = await getCurrentlyFeedingSubscriptions(vendorId);
 
   const plans = await db
     .select()
@@ -96,16 +127,21 @@ router.get("/vendor/dashboard", requireAuth("vendor"), async (req: AuthRequest, 
     .from(mealsTable)
     .where(eq(mealsTable.vendorId, vendorId));
 
-  const totalSubscribers = subs.length;
-  const activeSubscribers = subs.filter((s) => s.status === "active").length;
+  const totalSubscribers = totalSubscriberCount;
+  const activeSubscribers = feedingSubs.length;
 
   const planMap = new Map(plans.map((p) => [p.id, p]));
   let monthlyRevenue = 0;
   const planCounts = new Map<number, number>();
 
-  for (const s of subs.filter((s) => s.status === "active")) {
+  for (const s of feedingSubs) {
     const plan = planMap.get(s.planId);
     if (plan) {
+      // The plan's stored priceNaira is already the vendor's own net price
+      // (customers see it marked up separately — see toCustomerDisplayPriceNaira
+      // in lib/pricing.ts) covering the plan's full day-block cycle, so
+      // count * priceNaira is the vendor's projected monthly take for that
+      // plan; weekly is that same 4-week cycle divided evenly by 4.
       monthlyRevenue += plan.priceNaira;
       planCounts.set(s.planId, (planCounts.get(s.planId) ?? 0) + 1);
     }
@@ -162,14 +198,10 @@ router.get("/vendor/customers", requireAuth("vendor"), async (req: AuthRequest, 
 router.get("/vendor/earnings", requireAuth("vendor"), async (req: AuthRequest, res) => {
   const vendorId = req.session!.id;
   const plans = await db.select().from(subscriptionPlansTable).where(eq(subscriptionPlansTable.vendorId, vendorId));
-  const subs = await db
-    .select({ planId: subscriptionsTable.planId })
-    .from(subscriptionsTable)
-    .where(and(eq(subscriptionsTable.vendorId, vendorId), eq(subscriptionsTable.status, "active")));
+  const { feedingSubs } = await getCurrentlyFeedingSubscriptions(vendorId);
 
-  const planMap = new Map(plans.map((p) => [p.id, p]));
   const planCounts = new Map<number, number>();
-  for (const s of subs) {
+  for (const s of feedingSubs) {
     planCounts.set(s.planId, (planCounts.get(s.planId) ?? 0) + 1);
   }
 
@@ -903,6 +935,30 @@ router.post("/vendor/wallet/withdraw", requireAuth("vendor"), withdrawalRateLimi
     return;
   }
 
+  // Guard against firing a duplicate transfer attempt for the same amount in
+  // quick succession — e.g. a vendor repeatedly tapping "Withdraw" after a
+  // failure. If the most recent attempt for this exact amount failed within
+  // the last 5 minutes, don't hit Paystack again; surface the same failure
+  // instead so the vendor isn't racking up doomed transfer attempts.
+  const DUPLICATE_ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
+  const [lastAttempt] = await db
+    .select()
+    .from(vendorWithdrawalsTable)
+    .where(eq(vendorWithdrawalsTable.vendorId, vendorId))
+    .orderBy(desc(vendorWithdrawalsTable.createdAt))
+    .limit(1);
+  if (
+    lastAttempt &&
+    lastAttempt.status === "failed" &&
+    lastAttempt.amountNaira === amountNaira &&
+    Date.now() - new Date(lastAttempt.createdAt).getTime() < DUPLICATE_ATTEMPT_WINDOW_MS
+  ) {
+    res.status(429).json({
+      error: lastAttempt.failureReason || "This withdrawal attempt recently failed. Please wait a few minutes before trying again.",
+    });
+    return;
+  }
+
   const reference = `chopplan_wd_${crypto.randomUUID()}`;
   const [withdrawal] = await db
     .insert(vendorWithdrawalsTable)
@@ -946,8 +1002,16 @@ router.post("/vendor/wallet/withdraw", requireAuth("vendor"), withdrawalRateLimi
     }
   } catch (err) {
     logger.error({ err, withdrawalId: withdrawal.id }, "Failed to initiate Paystack transfer");
+    const rawMessage = err instanceof PaystackError ? err.message : "Failed to initiate transfer";
+    // A payout-restriction error means our Paystack account itself can't
+    // send transfers right now — every retry will fail identically until
+    // it's resolved with Paystack, so the vendor gets a calm, non-technical
+    // message instead of a raw API error, and (per the reservedNaira query
+    // above) their confirmed earnings stay intact and withdrawable since
+    // this row is marked "failed", not "success"/"pending".
+    const failureReason = isPayoutRestrictionError(rawMessage) ? PAYOUT_RESTRICTED_VENDOR_MESSAGE : rawMessage;
     await db.update(vendorWithdrawalsTable)
-      .set({ status: "failed", failureReason: err instanceof PaystackError ? err.message : "Failed to initiate transfer", updatedAt: new Date() })
+      .set({ status: "failed", failureReason, updatedAt: new Date() })
       .where(eq(vendorWithdrawalsTable.id, withdrawal.id));
   }
 

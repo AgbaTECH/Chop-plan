@@ -180,6 +180,28 @@ export async function createTransferRecipient(input: CreateTransferRecipientInpu
   return body.data?.recipient_code;
 }
 
+// Paystack rejects the transfer request outright (before ever debiting our
+// balance) when the destination Paystack account is restricted from sending
+// payouts to third parties — e.g. an unverified/"starter" business tier.
+// This is an account-level restriction on OUR Paystack account, not
+// something the vendor did wrong, so it deserves a distinct, non-technical
+// message instead of a raw Paystack error string, and repeated vendor
+// retries will fail identically until we resolve it with Paystack.
+const PAYOUT_RESTRICTION_PATTERNS = [
+  /third[\s-]?party/i,
+  /starter\s*(business)?/i,
+  /cannot initiate.*payout/i,
+  /upgrade your business/i,
+];
+
+export function isPayoutRestrictionError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return PAYOUT_RESTRICTION_PATTERNS.some((re) => re.test(message));
+}
+
+export const PAYOUT_RESTRICTED_VENDOR_MESSAGE =
+  "Payouts are temporarily unavailable — our team is resolving this with our payment provider.";
+
 export type PaystackTransferStatus = "success" | "pending" | "failed" | "otp";
 
 export interface InitiateTransferInput {
