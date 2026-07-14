@@ -140,6 +140,7 @@ router.get("/vendors/:vendorId", async (req, res) => {
     area: vendor.area,
     cuisineType: vendor.cuisineType,
     coverImage: vendor.coverImage ?? "",
+    kitchenPhotos: vendor.kitchenPhotos ?? [],
     rating: vendor.rating,
     subscriberCount: count,
     description: vendor.description ?? "",

@@ -38,3 +38,21 @@ The project's Resend connection is in sandbox mode (no verified domain): sending
 **Why:** discovered while building signup-OTP/password-reset email delivery — every send to a test/customer address failed until domain verification is done in Resend's dashboard.
 
 **How to apply:** don't trust "the email API call succeeded" during dev testing unless sending to the account owner's address; use a temporary server-side log of the generated code (removed before shipping) or a DB query to get the plaintext-equivalent for manual verification instead. A follow-up task tracks doing the domain verification for real delivery.
+
+## Object storage uploads (Kitchen Profile / meal photos)
+
+This app has its own custom Bearer-token session auth (`requireAuth("vendor")`), not Replit Auth — the `object-storage-web` skill template's `useUpload` hook does a raw unauthenticated `fetch` for step 1 (requesting the presigned URL), which silently fails here.
+
+**Why:** the skill assumes Replit Auth's cookie-based session, which rides along automatically with `fetch`; a custom Bearer-token scheme needs the token attached explicitly.
+
+**How to apply:** don't wire the template's `ObjectUploader`/`useUpload` directly in apps with custom token auth. Instead write a small custom hook that calls the generated, auth-aware API client function for the "request upload URL" step (so the Bearer token is attached automatically), then does a plain unauthenticated `fetch` PUT to the returned presigned URL for the actual bytes. Store the resulting fully-servable path (e.g. `/api/storage/objects/uploads/<uuid>`) directly in the DB field, matching whatever convention existing image fields already use, so read-side rendering needs zero changes.
+
+Also: seeded demo vendor accounts here have `verified=false`, which blocks login — any DB-side testing of a vendor flow needs a temporary `UPDATE vendors SET verified = true` (and revert after) to log in as one. Same applies to demo user/customer accounts.
+
+## Rebuilding `lib/db`'s dist after a schema change
+
+When `artifacts/api-server` typecheck fails with `TS6305: Output file '.../lib/db/dist/index.d.ts' has not been built from source file` right after editing `lib/db/src/schema/*`, deleting and rebuilding just `dist/` is not enough.
+
+**Why:** `lib/db`'s `tsconfig.json` is `composite: true` with incremental builds; a stale `tsconfig.tsbuildinfo` at the package root makes `tsc` think the (now-deleted) output is still current, so it skips re-emitting and `dist/` stays empty/stale.
+
+**How to apply:** from `lib/db/`, run `rm -f tsconfig.tsbuildinfo && rm -rf dist && npx tsc -p tsconfig.json`, then re-run the dependent package's typecheck. Deleting `dist` alone without also deleting `tsconfig.tsbuildinfo` silently no-ops.

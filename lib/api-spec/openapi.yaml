@@ -25,6 +25,8 @@ tags:
     description: Marketing lead capture
   - name: admin
     description: Admin dashboard - manage vendors, customers and view analytics
+  - name: Storage
+    description: Object storage upload and serving endpoints.
 
 paths:
   /healthz:
@@ -870,7 +872,93 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /user/notifications:
+    get:
+      operationId: listUserOrderNotifications
+      tags: [user]
+      summary: Get pickup-notification history for one of the user's own orders
+      parameters:
+        - name: orderType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [subscription, alacarte]
+        - name: subscriptionDayId
+          in: query
+          schema:
+            type: integer
+          description: Required when orderType is "subscription"
+        - name: paymentId
+          in: query
+          schema:
+            type: integer
+          description: Required when orderType is "alacarte"
+      responses:
+        "200":
+          description: Notification history, most recent first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderNotification"
+        "400":
+          description: Missing/invalid query params
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ── VENDOR dashboard ──────────────────────────────────────────────────────
+  # ── STORAGE ───────────────────────────────────────────────────────────────
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. The client sends JSON
+        metadata here, then uploads the file directly to the returned URL.
+        Vendor-only for now (Kitchen Profile and menu photo uploads).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing/invalid fields, file too large, or not an image.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated as a vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /vendor/profile:
     get:
       operationId: getVendorProfile
@@ -900,6 +988,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VendorProfile"
+
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+      description: |
+        Unconditionally public — no authentication or ACL checks.
+        Searches PUBLIC_OBJECT_SEARCH_PATHS for the given file path.
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relative file path within the public search paths.
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to serve public object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      description: |
+        Serves kitchen/menu photos uploaded via presigned URLs. Served
+        unauthenticated since these become customer-facing once saved.
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Object path within the private object dir (e.g. `uploads/some-uuid`).
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Object not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to serve object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /vendor/dashboard:
     get:
@@ -1145,6 +1305,94 @@ paths:
                   $ref: "#/components/schemas/ScheduleDay"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /vendor/alacarte/orders:
+    get:
+      operationId: listVendorAlacarteOrders
+      tags: [vendor]
+      summary: List à la carte orders placed with this vendor
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VendorAlacarteOrder"
+
+  /vendor/notifications:
+    get:
+      operationId: listVendorOrderNotifications
+      tags: [vendor]
+      summary: Get pickup-notification history for one of the vendor's own orders
+      parameters:
+        - name: orderType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [subscription, alacarte]
+        - name: subscriptionDayId
+          in: query
+          schema:
+            type: integer
+          description: Required when orderType is "subscription"
+        - name: paymentId
+          in: query
+          schema:
+            type: integer
+          description: Required when orderType is "alacarte"
+      responses:
+        "200":
+          description: Notification history, most recent first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderNotification"
+        "400":
+          description: Missing/invalid query params
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: sendVendorOrderNotification
+      tags: [vendor]
+      summary: Send a pickup notification to a customer about one of the vendor's own orders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderNotificationInput"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderNotification"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
           content:
             application/json:
               schema:
@@ -1515,6 +1763,36 @@ components:
           type: string
       required: [error]
 
+    # ── Storage ───────────────────────────────────────────────────────────
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Original file name.
+        size:
+          type: integer
+          minimum: 1
+          description: File size in bytes.
+        contentType:
+          type: string
+          minLength: 1
+          description: MIME type of the file (e.g. `image/jpeg`).
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          description: Presigned GCS URL for PUT upload.
+        objectPath:
+          type: string
+          description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
+
     # ── Auth ──────────────────────────────────────────────────────────────
     UserSignupInput:
       type: object
@@ -1683,7 +1961,7 @@ components:
 
     VendorDetail:
       type: object
-      required: [id, businessName, area, cuisineType, coverImage, rating, subscriberCount, description, plans, meals]
+      required: [id, businessName, area, cuisineType, coverImage, kitchenPhotos, rating, subscriberCount, description, plans, meals]
       properties:
         id:
           type: integer
@@ -1695,6 +1973,11 @@ components:
           type: string
         coverImage:
           type: string
+        kitchenPhotos:
+          type: array
+          items:
+            type: string
+          description: Additional kitchen photos beyond the cover image, shown on the vendor's public profile.
         rating:
           type: number
         subscriberCount:
@@ -2058,6 +2341,80 @@ components:
           type: string
           format: date-time
 
+    VendorAlacarteOrder:
+      type: object
+      required: [id, userId, userName, mealId, mealName, orderDate, amountNaira, status, pickupStatus, pickupConfirmedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        mealId:
+          type: ["integer", "null"]
+        mealName:
+          type: ["string", "null"]
+        orderDate:
+          type: ["string", "null"]
+          format: date
+        amountNaira:
+          type: integer
+        status:
+          type: string
+          enum: [pending, success, failed]
+        pickupStatus:
+          type: ["string", "null"]
+          enum: [pending, confirmed, null]
+        pickupConfirmedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderNotification:
+      type: object
+      required: [id, orderType, subscriptionDayId, paymentId, presetType, message, createdAt]
+      properties:
+        id:
+          type: integer
+        orderType:
+          type: string
+          enum: [subscription, alacarte]
+        subscriptionDayId:
+          type: ["integer", "null"]
+        paymentId:
+          type: ["integer", "null"]
+        presetType:
+          type: string
+          enum: [ready, delayed_10, delayed_20, custom]
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateOrderNotificationInput:
+      type: object
+      required: [orderType, presetType]
+      properties:
+        orderType:
+          type: string
+          enum: [subscription, alacarte]
+        subscriptionDayId:
+          type: integer
+          description: Required when orderType is "subscription"
+        paymentId:
+          type: integer
+          description: Required when orderType is "alacarte"
+        presetType:
+          type: string
+          enum: [ready, delayed_10, delayed_20, custom]
+        message:
+          type: string
+          description: Required (and used verbatim) only when presetType is "custom" — otherwise ignored in favor of the preset's canonical text.
+
     AlacarteOrderConfirmation:
       type: object
       required: [id, orderDate, amountNaira, pickupStatus, pickupConfirmedAt]
@@ -2079,7 +2436,7 @@ components:
     # ── Vendor dashboard ──────────────────────────────────────────────────
     VendorProfile:
       type: object
-      required: [id, businessName, ownerName, email, phone, area, cuisineType]
+      required: [id, businessName, ownerName, email, phone, area, cuisineType, kitchenPhotos]
       properties:
         id:
           type: integer
@@ -2099,6 +2456,11 @@ components:
           type: ["string", "null"]
         coverImage:
           type: ["string", "null"]
+        kitchenPhotos:
+          type: array
+          items:
+            type: string
+          description: Additional kitchen photos beyond the cover image.
 
     VendorProfileUpdate:
       type: object
@@ -2115,6 +2477,12 @@ components:
           type: string
         description:
           type: string
+        coverImage:
+          type: string
+        kitchenPhotos:
+          type: array
+          items:
+            type: string
 
     VendorDashboard:
       type: object

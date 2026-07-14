@@ -52,6 +52,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, UtensilsCrossed, ClipboardList, Crown, Star } from "lucide-react";
+import { PhotoUploadField } from "@/components/PhotoUploadField";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -59,7 +60,7 @@ type MealForm = {
   name: string;
   description: string;
   priceNaira: string;
-  imageUrl: string;
+  imageUrl: string | null;
   category: string;
   available: boolean;
 };
@@ -68,7 +69,7 @@ const emptyForm: MealForm = {
   name: "",
   description: "",
   priceNaira: "",
-  imageUrl: "",
+  imageUrl: null,
   category: "",
   available: true,
 };
@@ -96,7 +97,7 @@ export default function VendorMealsPage() {
       name: meal.name,
       description: meal.description,
       priceNaira: String(meal.priceNaira),
-      imageUrl: meal.imageUrl,
+      imageUrl: meal.imageUrl || null,
       category: meal.category || "",
       available: meal.available,
     });
@@ -104,6 +105,10 @@ export default function VendorMealsPage() {
   };
 
   const handleSubmit = () => {
+    if (!form.imageUrl) {
+      toast({ title: "Add a photo of this meal", variant: "destructive" });
+      return;
+    }
     const payload = {
       name: form.name,
       description: form.description,
@@ -176,10 +181,13 @@ export default function VendorMealsPage() {
                   <Input id="meal-category" placeholder="e.g. Rice, Soups" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="input-meal-category" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="meal-image">Image URL</Label>
-                <Input id="meal-image" placeholder="/images/meal.jpg" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} data-testid="input-meal-image" />
-              </div>
+              <PhotoUploadField
+                label="Meal photo"
+                testIdPrefix="meal-image"
+                value={form.imageUrl}
+                onChange={(url) => setForm({ ...form, imageUrl: url })}
+                emptyHint="Shown to customers on this meal's card"
+              />
               <div className="flex items-center justify-between border rounded-md p-3">
                 <Label htmlFor="meal-available">Available</Label>
                 <Switch id="meal-available" checked={form.available} onCheckedChange={(v) => setForm({ ...form, available: v })} data-testid="switch-meal-available" />

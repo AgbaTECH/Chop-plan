@@ -13,4 +13,6 @@ export interface VendorProfileUpdate {
   area?: string;
   cuisineType?: string;
   description?: string;
+  coverImage?: string;
+  kitchenPhotos?: string[];
 }

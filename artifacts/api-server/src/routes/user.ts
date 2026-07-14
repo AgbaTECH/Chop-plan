@@ -9,6 +9,7 @@ import {
   subscriptionDaysTable,
   mealsTable,
   paymentsTable,
+  orderNotificationsTable,
 } from "@workspace/db";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
@@ -436,6 +437,78 @@ router.post("/user/subscriptions/:subscriptionId/schedule/:dayId/confirm", requi
     isFreeDay: updated.isFreeDay,
     mealName: meal?.name ?? null,
   });
+});
+
+// GET /user/notifications — pickup-notification history the customer has
+// received about one of their own orders (subscription day or à la carte),
+// mirroring GET /vendor/notifications on the vendor side.
+router.get("/user/notifications", requireAuth("user"), async (req: AuthRequest, res) => {
+  const userId = req.session!.id;
+  const orderType = String(req.query.orderType ?? "");
+  const subscriptionDayId = req.query.subscriptionDayId ? Number(req.query.subscriptionDayId) : undefined;
+  const paymentId = req.query.paymentId ? Number(req.query.paymentId) : undefined;
+
+  if (orderType !== "subscription" && orderType !== "alacarte") {
+    res.status(400).json({ error: "orderType query param must be 'subscription' or 'alacarte'" });
+    return;
+  }
+
+  // Confirm this order actually belongs to the requesting user before
+  // returning any notification history for it.
+  if (orderType === "subscription") {
+    if (!subscriptionDayId) {
+      res.status(400).json({ error: "subscriptionDayId is required for orderType 'subscription'" });
+      return;
+    }
+    const [owned] = await db
+      .select({ id: subscriptionDaysTable.id })
+      .from(subscriptionDaysTable)
+      .innerJoin(subscriptionsTable, eq(subscriptionDaysTable.subscriptionId, subscriptionsTable.id))
+      .where(and(eq(subscriptionDaysTable.id, subscriptionDayId), eq(subscriptionsTable.userId, userId)));
+    if (!owned) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+  } else {
+    if (!paymentId) {
+      res.status(400).json({ error: "paymentId is required for orderType 'alacarte'" });
+      return;
+    }
+    const [owned] = await db
+      .select({ id: paymentsTable.id })
+      .from(paymentsTable)
+      .where(and(eq(paymentsTable.id, paymentId), eq(paymentsTable.userId, userId), eq(paymentsTable.orderType, "alacarte")));
+    if (!owned) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+  }
+
+  const rows = await db
+    .select()
+    .from(orderNotificationsTable)
+    .where(
+      and(
+        eq(orderNotificationsTable.userId, userId),
+        eq(orderNotificationsTable.orderType, orderType),
+        orderType === "subscription"
+          ? eq(orderNotificationsTable.subscriptionDayId, subscriptionDayId!)
+          : eq(orderNotificationsTable.paymentId, paymentId!)
+      )
+    )
+    .orderBy(desc(orderNotificationsTable.createdAt));
+
+  res.json(
+    rows.map((n) => ({
+      id: n.id,
+      orderType: n.orderType as "subscription" | "alacarte",
+      subscriptionDayId: n.subscriptionDayId,
+      paymentId: n.paymentId,
+      presetType: n.presetType,
+      message: n.message,
+      createdAt: n.createdAt,
+    }))
+  );
 });
 
 export default router;

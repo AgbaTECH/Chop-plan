@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { NotificationHistory } from "@/components/OrderNotifications";
 import { Calendar, User, Clock, Utensils, AlertTriangle, CalendarCheck, Check, ShoppingBag } from "lucide-react";
 
 function SubscriptionScheduleDialog({ subscriptionId, open, onOpenChange }: { subscriptionId: number | null; open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -56,21 +57,24 @@ function SubscriptionScheduleDialog({ subscriptionId, open, onOpenChange }: { su
               const dateStr = new Date(day.scheduledDate).toISOString().split("T")[0];
               const canConfirm = day.status === "pending" && dateStr <= todayStr;
               return (
-                <div key={day.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <span className="text-sm font-mono">
-                    Day {day.dayNumber} &middot; {new Date(day.scheduledDate).toLocaleDateString()}
-                    {day.mealName && <> &middot; {day.mealName}</>}
-                    {day.isFreeDay && <> &middot; <span className="text-accent">Free day</span></>}
-                  </span>
-                  {day.status === "confirmed" ? (
-                    <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Confirmed</Badge>
-                  ) : canConfirm ? (
-                    <Button size="sm" variant="outline" className="font-mono" onClick={() => handleConfirm(day.id)} disabled={confirmPickup.isPending}>
-                      Confirm Received
-                    </Button>
-                  ) : (
-                    <Badge variant="secondary" className="font-mono uppercase text-[10px]">Upcoming</Badge>
-                  )}
+                <div key={day.id} className="py-2 border-b last:border-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-mono">
+                      Day {day.dayNumber} &middot; {new Date(day.scheduledDate).toLocaleDateString()}
+                      {day.mealName && <> &middot; {day.mealName}</>}
+                      {day.isFreeDay && <> &middot; <span className="text-accent">Free day</span></>}
+                    </span>
+                    {day.status === "confirmed" ? (
+                      <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Confirmed</Badge>
+                    ) : canConfirm ? (
+                      <Button size="sm" variant="outline" className="font-mono" onClick={() => handleConfirm(day.id)} disabled={confirmPickup.isPending}>
+                        Confirm Received
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary" className="font-mono uppercase text-[10px]">Upcoming</Badge>
+                    )}
+                  </div>
+                  <NotificationHistory orderRef={{ orderType: "subscription", subscriptionDayId: day.id }} viewer="user" />
                 </div>
               );
             })}
@@ -321,34 +325,39 @@ export default function UserDashboardPage() {
                 const canConfirm = order.status === "success" && order.pickupStatus === "pending";
                 return (
                   <Card key={order.id} className="border-border">
-                    <CardContent className="p-5 flex items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant={order.status === "success" ? "default" : order.status === "failed" ? "destructive" : "secondary"} className="font-mono text-xs uppercase">
-                            {order.status}
-                          </Badge>
-                          {order.pickupStatus === "confirmed" && (
-                            <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Picked Up</Badge>
-                          )}
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={order.status === "success" ? "default" : order.status === "failed" ? "destructive" : "secondary"} className="font-mono text-xs uppercase">
+                              {order.status}
+                            </Badge>
+                            {order.pickupStatus === "confirmed" && (
+                              <Badge className="font-mono uppercase text-[10px] gap-1"><Check className="w-3 h-3" /> Picked Up</Badge>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-serif font-bold">
+                            {order.mealName || "Meal"} <span className="text-muted-foreground font-normal text-sm">from</span> {order.vendorName}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : ""} · ₦{order.amountNaira.toLocaleString('en-NG')}
+                          </p>
                         </div>
-                        <h3 className="text-lg font-serif font-bold">
-                          {order.mealName || "Meal"} <span className="text-muted-foreground font-normal text-sm">from</span> {order.vendorName}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : ""} · ₦{order.amountNaira.toLocaleString('en-NG')}
-                        </p>
+                        {canConfirm && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="font-mono shrink-0"
+                            onClick={() => handleConfirmAlacarte(order.id)}
+                            disabled={confirmAlacarte.isPending}
+                            data-testid={`button-confirm-alacarte-order-${order.id}`}
+                          >
+                            Confirm Received
+                          </Button>
+                        )}
                       </div>
-                      {canConfirm && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="font-mono shrink-0"
-                          onClick={() => handleConfirmAlacarte(order.id)}
-                          disabled={confirmAlacarte.isPending}
-                          data-testid={`button-confirm-alacarte-order-${order.id}`}
-                        >
-                          Confirm Received
-                        </Button>
+                      {order.status === "success" && (
+                        <NotificationHistory orderRef={{ orderType: "alacarte", paymentId: order.id }} viewer="user" />
                       )}
                     </CardContent>
                   </Card>

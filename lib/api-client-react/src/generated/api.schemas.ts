@@ -18,6 +18,32 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface UploadUrlRequest {
+  /**
+     * Original file name.
+     * @minLength 1
+     */
+  name: string;
+  /**
+     * File size in bytes.
+     * @minimum 1
+     */
+  size: number;
+  /**
+     * MIME type of the file (e.g. `image/jpeg`).
+     * @minLength 1
+     */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  /** Presigned GCS URL for PUT upload. */
+  uploadURL: string;
+  /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
+  objectPath: string;
+  metadata?: UploadUrlRequest;
+}
+
 export interface UserSignupInput {
   name: string;
   email: string;
@@ -185,6 +211,8 @@ export interface VendorDetail {
   area: string;
   cuisineType: string;
   coverImage: string;
+  /** Additional kitchen photos beyond the cover image, shown on the vendor's public profile. */
+  kitchenPhotos: string[];
   rating: number;
   subscriberCount: number;
   description: string;
@@ -377,6 +405,104 @@ export interface AlacarteOrder {
   createdAt: string;
 }
 
+export type VendorAlacarteOrderStatus = typeof VendorAlacarteOrderStatus[keyof typeof VendorAlacarteOrderStatus];
+
+
+export const VendorAlacarteOrderStatus = {
+  pending: 'pending',
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+/**
+ * @nullable
+ */
+export type VendorAlacarteOrderPickupStatus = typeof VendorAlacarteOrderPickupStatus[keyof typeof VendorAlacarteOrderPickupStatus] | null;
+
+
+export const VendorAlacarteOrderPickupStatus = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+} as const;
+
+export interface VendorAlacarteOrder {
+  id: number;
+  userId: number;
+  userName: string;
+  /** @nullable */
+  mealId: number | null;
+  /** @nullable */
+  mealName: string | null;
+  /** @nullable */
+  orderDate: string | null;
+  amountNaira: number;
+  status: VendorAlacarteOrderStatus;
+  /** @nullable */
+  pickupStatus: VendorAlacarteOrderPickupStatus;
+  /** @nullable */
+  pickupConfirmedAt: string | null;
+  createdAt: string;
+}
+
+export type OrderNotificationOrderType = typeof OrderNotificationOrderType[keyof typeof OrderNotificationOrderType];
+
+
+export const OrderNotificationOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
+
+export type OrderNotificationPresetType = typeof OrderNotificationPresetType[keyof typeof OrderNotificationPresetType];
+
+
+export const OrderNotificationPresetType = {
+  ready: 'ready',
+  delayed_10: 'delayed_10',
+  delayed_20: 'delayed_20',
+  custom: 'custom',
+} as const;
+
+export interface OrderNotification {
+  id: number;
+  orderType: OrderNotificationOrderType;
+  /** @nullable */
+  subscriptionDayId: number | null;
+  /** @nullable */
+  paymentId: number | null;
+  presetType: OrderNotificationPresetType;
+  message: string;
+  createdAt: string;
+}
+
+export type CreateOrderNotificationInputOrderType = typeof CreateOrderNotificationInputOrderType[keyof typeof CreateOrderNotificationInputOrderType];
+
+
+export const CreateOrderNotificationInputOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
+
+export type CreateOrderNotificationInputPresetType = typeof CreateOrderNotificationInputPresetType[keyof typeof CreateOrderNotificationInputPresetType];
+
+
+export const CreateOrderNotificationInputPresetType = {
+  ready: 'ready',
+  delayed_10: 'delayed_10',
+  delayed_20: 'delayed_20',
+  custom: 'custom',
+} as const;
+
+export interface CreateOrderNotificationInput {
+  orderType: CreateOrderNotificationInputOrderType;
+  /** Required when orderType is "subscription" */
+  subscriptionDayId?: number;
+  /** Required when orderType is "alacarte" */
+  paymentId?: number;
+  presetType: CreateOrderNotificationInputPresetType;
+  /** Required (and used verbatim) only when presetType is "custom" — otherwise ignored in favor of the preset's canonical text. */
+  message?: string;
+}
+
 export type AlacarteOrderConfirmationPickupStatus = typeof AlacarteOrderConfirmationPickupStatus[keyof typeof AlacarteOrderConfirmationPickupStatus];
 
 
@@ -407,6 +533,8 @@ export interface VendorProfile {
   description?: string | null;
   /** @nullable */
   coverImage?: string | null;
+  /** Additional kitchen photos beyond the cover image. */
+  kitchenPhotos: string[];
 }
 
 export interface VendorProfileUpdate {
@@ -416,6 +544,8 @@ export interface VendorProfileUpdate {
   area?: string;
   cuisineType?: string;
   description?: string;
+  coverImage?: string;
+  kitchenPhotos?: string[];
 }
 
 export interface PlanBreakdown {
@@ -658,4 +788,44 @@ area?: string;
  */
 search?: string;
 };
+
+export type ListUserOrderNotificationsParams = {
+orderType: ListUserOrderNotificationsOrderType;
+/**
+ * Required when orderType is "subscription"
+ */
+subscriptionDayId?: number;
+/**
+ * Required when orderType is "alacarte"
+ */
+paymentId?: number;
+};
+
+export type ListUserOrderNotificationsOrderType = typeof ListUserOrderNotificationsOrderType[keyof typeof ListUserOrderNotificationsOrderType];
+
+
+export const ListUserOrderNotificationsOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
+
+export type ListVendorOrderNotificationsParams = {
+orderType: ListVendorOrderNotificationsOrderType;
+/**
+ * Required when orderType is "subscription"
+ */
+subscriptionDayId?: number;
+/**
+ * Required when orderType is "alacarte"
+ */
+paymentId?: number;
+};
+
+export type ListVendorOrderNotificationsOrderType = typeof ListVendorOrderNotificationsOrderType[keyof typeof ListVendorOrderNotificationsOrderType];
+
+
+export const ListVendorOrderNotificationsOrderType = {
+  subscription: 'subscription',
+  alacarte: 'alacarte',
+} as const;
 

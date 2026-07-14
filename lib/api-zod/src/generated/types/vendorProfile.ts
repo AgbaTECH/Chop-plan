@@ -18,4 +18,6 @@ export interface VendorProfile {
   description?: string | null;
   /** @nullable */
   coverImage?: string | null;
+  /** Additional kitchen photos beyond the cover image. */
+  kitchenPhotos: string[];
 }

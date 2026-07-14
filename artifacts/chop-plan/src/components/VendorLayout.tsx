@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, CreditCard, UtensilsCrossed, Wallet } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, UtensilsCrossed, Wallet, ChefHat } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface VendorLayoutProps {
@@ -33,6 +33,7 @@ export function VendorLayout({ children, title }: VendorLayoutProps) {
     { href: "/vendor/earnings", label: "Earnings", icon: CreditCard },
     { href: "/vendor/wallet", label: "Wallet", icon: Wallet },
     { href: "/vendor/meals", label: "Menu & Plans", icon: UtensilsCrossed },
+    { href: "/vendor/kitchen-profile", label: "Kitchen Profile", icon: ChefHat },
   ];
 
   return (

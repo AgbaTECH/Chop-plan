@@ -14,6 +14,8 @@ export interface VendorDetail {
   area: string;
   cuisineType: string;
   coverImage: string;
+  /** Additional kitchen photos beyond the cover image, shown on the vendor's public profile. */
+  kitchenPhotos: string[];
   rating: number;
   subscriberCount: number;
   description: string;

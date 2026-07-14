@@ -302,6 +302,7 @@ export const GetVendorResponse = zod.object({
   "area": zod.string(),
   "cuisineType": zod.string(),
   "coverImage": zod.string(),
+  "kitchenPhotos": zod.array(zod.string()).describe('Additional kitchen photos beyond the cover image, shown on the vendor\'s public profile.'),
   "rating": zod.number(),
   "subscriberCount": zod.number(),
   "description": zod.string(),
@@ -630,6 +631,60 @@ export const ConfirmAlacartePickupResponse = zod.object({
 
 
 /**
+ * @summary Get pickup-notification history for one of the user's own orders
+ */
+export const ListUserOrderNotificationsQueryParams = zod.object({
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "subscriptionDayId": zod.coerce.number().optional().describe('Required when orderType is \"subscription\"'),
+  "paymentId": zod.coerce.number().optional().describe('Required when orderType is \"alacarte\"')
+})
+
+export const ListUserOrderNotificationsResponseItem = zod.object({
+  "id": zod.number(),
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "subscriptionDayId": zod.number().nullable(),
+  "paymentId": zod.number().nullable(),
+  "presetType": zod.enum(['ready', 'delayed_10', 'delayed_20', 'custom']),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListUserOrderNotificationsResponse = zod.array(ListUserOrderNotificationsResponseItem)
+
+
+/**
+ * Returns a presigned GCS URL for direct upload. The client sends JSON
+ * metadata here, then uploads the file directly to the returned URL.
+ * Vendor-only for now (Kitchen Profile and menu photo uploads).
+ * @summary Request a presigned URL for file upload
+ */
+
+
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `image\/jpeg`).')
+})
+
+
+
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().describe('Presigned GCS URL for PUT upload.'),
+  "objectPath": zod.string().describe('Normalized object path (e.g. `\/objects\/uploads\/uuid`). Store this in your database.'),
+  "metadata": zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `image\/jpeg`).')
+}).optional()
+})
+
+
+/**
  * @summary Get logged-in vendor profile
  */
 export const GetVendorProfileResponse = zod.object({
@@ -641,7 +696,8 @@ export const GetVendorProfileResponse = zod.object({
   "area": zod.string(),
   "cuisineType": zod.string(),
   "description": zod.string().nullish(),
-  "coverImage": zod.string().nullish()
+  "coverImage": zod.string().nullish(),
+  "kitchenPhotos": zod.array(zod.string()).describe('Additional kitchen photos beyond the cover image.')
 })
 
 
@@ -654,7 +710,9 @@ export const UpdateVendorProfileBody = zod.object({
   "phone": zod.string().optional(),
   "area": zod.string().optional(),
   "cuisineType": zod.string().optional(),
-  "description": zod.string().optional()
+  "description": zod.string().optional(),
+  "coverImage": zod.string().optional(),
+  "kitchenPhotos": zod.array(zod.string()).optional()
 })
 
 export const UpdateVendorProfileResponse = zod.object({
@@ -666,8 +724,33 @@ export const UpdateVendorProfileResponse = zod.object({
   "area": zod.string(),
   "cuisineType": zod.string(),
   "description": zod.string().nullish(),
-  "coverImage": zod.string().nullish()
+  "coverImage": zod.string().nullish(),
+  "kitchenPhotos": zod.array(zod.string()).describe('Additional kitchen photos beyond the cover image.')
 })
+
+
+/**
+ * Unconditionally public — no authentication or ACL checks.
+ * Searches PUBLIC_OBJECT_SEARCH_PATHS for the given file path.
+ * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ */
+export const GetPublicObjectParams = zod.object({
+  "filePath": zod.coerce.string().describe('Relative file path within the public search paths.')
+})
+
+export const GetPublicObjectResponse = zod.unknown()
+
+
+/**
+ * Serves kitchen/menu photos uploaded via presigned URLs. Served
+ * unauthenticated since these become customer-facing once saved.
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string().describe('Object path within the private object dir (e.g. `uploads\/some-uuid`).')
+})
+
+export const GetStorageObjectResponse = zod.unknown()
 
 
 /**
@@ -931,6 +1014,68 @@ export const GetVendorCustomerScheduleResponseItem = zod.object({
   "mealName": zod.string().nullable()
 })
 export const GetVendorCustomerScheduleResponse = zod.array(GetVendorCustomerScheduleResponseItem)
+
+
+/**
+ * @summary List à la carte orders placed with this vendor
+ */
+export const ListVendorAlacarteOrdersResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "mealId": zod.number().nullable(),
+  "mealName": zod.string().nullable(),
+  "orderDate": zod.coerce.date().nullable(),
+  "amountNaira": zod.number(),
+  "status": zod.enum(['pending', 'success', 'failed']),
+  "pickupStatus": zod.union([zod.literal('pending'),zod.literal('confirmed'),zod.literal(null)]).nullable(),
+  "pickupConfirmedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorAlacarteOrdersResponse = zod.array(ListVendorAlacarteOrdersResponseItem)
+
+
+/**
+ * @summary Get pickup-notification history for one of the vendor's own orders
+ */
+export const ListVendorOrderNotificationsQueryParams = zod.object({
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "subscriptionDayId": zod.coerce.number().optional().describe('Required when orderType is \"subscription\"'),
+  "paymentId": zod.coerce.number().optional().describe('Required when orderType is \"alacarte\"')
+})
+
+export const ListVendorOrderNotificationsResponseItem = zod.object({
+  "id": zod.number(),
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "subscriptionDayId": zod.number().nullable(),
+  "paymentId": zod.number().nullable(),
+  "presetType": zod.enum(['ready', 'delayed_10', 'delayed_20', 'custom']),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorOrderNotificationsResponse = zod.array(ListVendorOrderNotificationsResponseItem)
+
+
+/**
+ * @summary Send a pickup notification to a customer about one of the vendor's own orders
+ */
+export const SendVendorOrderNotificationBody = zod.object({
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "subscriptionDayId": zod.number().optional().describe('Required when orderType is \"subscription\"'),
+  "paymentId": zod.number().optional().describe('Required when orderType is \"alacarte\"'),
+  "presetType": zod.enum(['ready', 'delayed_10', 'delayed_20', 'custom']),
+  "message": zod.string().optional().describe('Required (and used verbatim) only when presetType is \"custom\" — otherwise ignored in favor of the preset\'s canonical text.')
+})
+
+export const SendVendorOrderNotificationResponse = zod.object({
+  "id": zod.number(),
+  "orderType": zod.enum(['subscription', 'alacarte']),
+  "subscriptionDayId": zod.number().nullable(),
+  "paymentId": zod.number().nullable(),
+  "presetType": zod.enum(['ready', 'delayed_10', 'delayed_20', 'custom']),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})
 
 
 /**

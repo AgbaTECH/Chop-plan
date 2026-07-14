@@ -11,12 +11,14 @@ import {
   vendorWithdrawalsTable,
   vendorBankAccountsTable,
   paymentsTable,
+  orderNotificationsTable,
 } from "@workspace/db";
 import { eq, and, sql, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { perDayShareNaira, PREMIUM_DAYS_PER_MONTH, PREMIUM_FREE_DAYS } from "../lib/schedule";
 import { listBanks, resolveAccountNumber, createTransferRecipient, initiateTransfer, PaystackError } from "../lib/paystack";
 import { logger } from "../lib/logger";
+import { PRESET_TYPES, PresetType, resolveNotificationMessage } from "../lib/notifications";
 import crypto from "node:crypto";
 
 const router = Router();
@@ -35,12 +37,13 @@ router.get("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, re
     cuisineType: v.cuisineType,
     description: v.description ?? null,
     coverImage: v.coverImage ?? null,
+    kitchenPhotos: v.kitchenPhotos ?? [],
   });
 });
 
 // PATCH /vendor/profile
 router.patch("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, res) => {
-  const { businessName, ownerName, phone, area, cuisineType, description } = req.body;
+  const { businessName, ownerName, phone, area, cuisineType, description, coverImage, kitchenPhotos } = req.body;
   const updates: Partial<typeof vendorsTable.$inferInsert> = {};
   if (businessName) updates.businessName = businessName;
   if (ownerName) updates.ownerName = ownerName;
@@ -48,11 +51,20 @@ router.patch("/vendor/profile", requireAuth("vendor"), async (req: AuthRequest, 
   if (area) updates.area = area;
   if (cuisineType) updates.cuisineType = cuisineType;
   if (description !== undefined) updates.description = description;
+  if (coverImage !== undefined) updates.coverImage = coverImage;
+  if (kitchenPhotos !== undefined) {
+    if (!Array.isArray(kitchenPhotos) || !kitchenPhotos.every((p) => typeof p === "string")) {
+      res.status(400).json({ error: "kitchenPhotos must be an array of strings" });
+      return;
+    }
+    updates.kitchenPhotos = kitchenPhotos;
+  }
   const [v] = await db.update(vendorsTable).set(updates).where(eq(vendorsTable.id, req.session!.id)).returning();
   res.json({
     id: v.id, businessName: v.businessName, ownerName: v.ownerName,
     email: v.email, phone: v.phone, area: v.area, cuisineType: v.cuisineType,
     description: v.description ?? null, coverImage: v.coverImage ?? null,
+    kitchenPhotos: v.kitchenPhotos ?? [],
   });
 });
 
@@ -506,6 +518,175 @@ router.get("/vendor/customers/:subscriptionId/schedule", requireAuth("vendor"), 
     isFreeDay: d.isFreeDay,
     mealName: d.mealName ?? null,
   })));
+});
+
+// GET /vendor/alacarte/orders — the vendor-side view of à la carte orders
+// placed with them, so they know which off-schedule pickups they can notify
+// about (mirrors GET /user/alacarte/orders on the customer side).
+router.get("/vendor/alacarte/orders", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const orders = await db
+    .select({
+      id: paymentsTable.id,
+      userId: paymentsTable.userId,
+      userName: usersTable.name,
+      mealId: paymentsTable.mealId,
+      mealName: mealsTable.name,
+      orderDate: paymentsTable.orderDate,
+      amountNaira: paymentsTable.amountNaira,
+      status: paymentsTable.status,
+      pickupStatus: paymentsTable.pickupStatus,
+      pickupConfirmedAt: paymentsTable.pickupConfirmedAt,
+      createdAt: paymentsTable.createdAt,
+    })
+    .from(paymentsTable)
+    .innerJoin(usersTable, eq(paymentsTable.userId, usersTable.id))
+    .leftJoin(mealsTable, eq(paymentsTable.mealId, mealsTable.id))
+    .where(and(eq(paymentsTable.vendorId, vendorId), eq(paymentsTable.orderType, "alacarte")))
+    .orderBy(desc(paymentsTable.createdAt));
+
+  res.json(
+    orders.map((o) => ({
+      id: o.id,
+      userId: o.userId,
+      userName: o.userName,
+      mealId: o.mealId,
+      mealName: o.mealName ?? null,
+      orderDate: o.orderDate,
+      amountNaira: o.amountNaira,
+      status: o.status as "pending" | "success" | "failed",
+      pickupStatus: (o.pickupStatus ?? null) as "pending" | "confirmed" | null,
+      pickupConfirmedAt: o.pickupConfirmedAt,
+      createdAt: o.createdAt,
+    }))
+  );
+});
+
+// Resolves which vendor/user own a notifiable order, given the discriminator
+// + id pair from the request. Returns null if the order doesn't exist or
+// doesn't belong to this vendor — callers should 404 in that case. Shared by
+// the vendor notify (POST) and history (GET) endpoints so ownership is
+// checked identically in both places.
+async function resolveVendorOrder(
+  vendorId: number,
+  orderType: string,
+  subscriptionDayId: number | undefined,
+  paymentId: number | undefined
+): Promise<{ userId: number } | null> {
+  if (orderType === "subscription") {
+    if (!subscriptionDayId) return null;
+    const [row] = await db
+      .select({ userId: subscriptionsTable.userId })
+      .from(subscriptionDaysTable)
+      .innerJoin(subscriptionsTable, eq(subscriptionDaysTable.subscriptionId, subscriptionsTable.id))
+      .where(and(eq(subscriptionDaysTable.id, subscriptionDayId), eq(subscriptionsTable.vendorId, vendorId)));
+    return row ?? null;
+  }
+  if (orderType === "alacarte") {
+    if (!paymentId) return null;
+    const [row] = await db
+      .select({ userId: paymentsTable.userId })
+      .from(paymentsTable)
+      .where(and(eq(paymentsTable.id, paymentId), eq(paymentsTable.vendorId, vendorId), eq(paymentsTable.orderType, "alacarte")));
+    return row ?? null;
+  }
+  return null;
+}
+
+// POST /vendor/notifications — send a pickup notification to a customer
+// about one of the vendor's own orders (subscription day or à la carte).
+router.post("/vendor/notifications", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const { orderType, subscriptionDayId, paymentId, presetType, message } = req.body ?? {};
+
+  if (orderType !== "subscription" && orderType !== "alacarte") {
+    res.status(400).json({ error: "orderType must be 'subscription' or 'alacarte'" });
+    return;
+  }
+  if (typeof presetType !== "string" || !PRESET_TYPES.includes(presetType as PresetType)) {
+    res.status(400).json({ error: `presetType must be one of: ${PRESET_TYPES.join(", ")}` });
+    return;
+  }
+
+  const owner = await resolveVendorOrder(vendorId, orderType, subscriptionDayId, paymentId);
+  if (!owner) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+
+  const resolved = resolveNotificationMessage(presetType, message);
+  if (!resolved.ok) {
+    res.status(400).json({ error: resolved.error });
+    return;
+  }
+
+  const [created] = await db
+    .insert(orderNotificationsTable)
+    .values({
+      vendorId,
+      userId: owner.userId,
+      orderType,
+      subscriptionDayId: orderType === "subscription" ? subscriptionDayId : null,
+      paymentId: orderType === "alacarte" ? paymentId : null,
+      presetType,
+      message: resolved.message,
+    })
+    .returning();
+
+  res.status(201).json({
+    id: created.id,
+    orderType: created.orderType as "subscription" | "alacarte",
+    subscriptionDayId: created.subscriptionDayId,
+    paymentId: created.paymentId,
+    presetType: created.presetType,
+    message: created.message,
+    createdAt: created.createdAt,
+  });
+});
+
+// GET /vendor/notifications — notification history for one of the vendor's
+// orders (query by orderType + subscriptionDayId or paymentId).
+router.get("/vendor/notifications", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const orderType = String(req.query.orderType ?? "");
+  const subscriptionDayId = req.query.subscriptionDayId ? Number(req.query.subscriptionDayId) : undefined;
+  const paymentId = req.query.paymentId ? Number(req.query.paymentId) : undefined;
+
+  if (orderType !== "subscription" && orderType !== "alacarte") {
+    res.status(400).json({ error: "orderType query param must be 'subscription' or 'alacarte'" });
+    return;
+  }
+  const owner = await resolveVendorOrder(vendorId, orderType, subscriptionDayId, paymentId);
+  if (!owner) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+
+  const rows = await db
+    .select()
+    .from(orderNotificationsTable)
+    .where(
+      and(
+        eq(orderNotificationsTable.vendorId, vendorId),
+        eq(orderNotificationsTable.orderType, orderType),
+        orderType === "subscription"
+          ? eq(orderNotificationsTable.subscriptionDayId, subscriptionDayId!)
+          : eq(orderNotificationsTable.paymentId, paymentId!)
+      )
+    )
+    .orderBy(desc(orderNotificationsTable.createdAt));
+
+  res.json(
+    rows.map((n) => ({
+      id: n.id,
+      orderType: n.orderType as "subscription" | "alacarte",
+      subscriptionDayId: n.subscriptionDayId,
+      paymentId: n.paymentId,
+      presetType: n.presetType,
+      message: n.message,
+      createdAt: n.createdAt,
+    }))
+  );
 });
 
 async function getVendorWalletSummary(vendorId: number) {

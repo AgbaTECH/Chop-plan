@@ -1,4 +1,5 @@
 import { pgTable, serial, text, timestamp, varchar, real, boolean, integer } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,6 +14,11 @@ export const vendorsTable = pgTable("vendors", {
   cuisineType: varchar("cuisine_type", { length: 100 }).notNull(),
   description: text("description"),
   coverImage: text("cover_image"),
+  // Additional kitchen photos beyond the single cover image, shown on the
+  // vendor's public profile. Stored as fully-servable paths (e.g.
+  // "/api/storage/objects/uploads/<uuid>"), same convention as coverImage
+  // and mealsTable.imageUrl, so rendering never needs extra path logic.
+  kitchenPhotos: text("kitchen_photos").array().notNull().default(sql`'{}'::text[]`),
   rating: real("rating").default(4.5).notNull(),
   verified: boolean("verified").default(false).notNull(),
   // Admin-configurable override for the off-schedule (à la carte) markup

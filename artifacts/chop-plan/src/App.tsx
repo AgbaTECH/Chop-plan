@@ -24,6 +24,7 @@ import VendorDashboardPage from './pages/VendorDashboardPage';
 import VendorCustomersPage from './pages/VendorCustomersPage';
 import VendorEarningsPage from './pages/VendorEarningsPage';
 import VendorMealsPage from './pages/VendorMealsPage';
+import VendorKitchenProfilePage from './pages/VendorKitchenProfilePage';
 import VendorWalletPage from './pages/VendorWalletPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminVendorsPage from './pages/AdminVendorsPage';
@@ -66,6 +67,7 @@ function Router() {
           <Route path="/vendor/earnings" component={VendorEarningsPage} />
           <Route path="/vendor/wallet" component={VendorWalletPage} />
           <Route path="/vendor/meals" component={VendorMealsPage} />
+          <Route path="/vendor/kitchen-profile" component={VendorKitchenProfilePage} />
 
           <Route path="/admin/dashboard" component={AdminDashboardPage} />
           <Route path="/admin/vendors" component={AdminVendorsPage} />

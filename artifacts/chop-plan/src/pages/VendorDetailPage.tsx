@@ -185,6 +185,22 @@ export default function VendorDetailPage() {
           
           {/* Main Content: Meals */}
           <div className="flex-1">
+            {vendor.kitchenPhotos && vendor.kitchenPhotos.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-3xl font-serif font-bold mb-6 flex items-center gap-3">
+                  <Utensils className="w-7 h-7 text-primary" />
+                  Inside the Kitchen
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {vendor.kitchenPhotos.map((photo, i) => (
+                    <div key={`${photo}-${i}`} className="aspect-square rounded-lg overflow-hidden bg-muted border border-border">
+                      <img src={photo} alt={`${vendor.businessName} kitchen photo ${i + 1}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <h2 className="text-3xl font-serif font-bold mb-8 flex items-center gap-3">
               <Utensils className="w-7 h-7 text-primary" />
               Sample Meals
