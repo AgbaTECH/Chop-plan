@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/chop-plan/"
+previewPath = "/"
 title = "Chop Plan App"
 version = "1.0.0"
 id = "artifacts/chop-plan"
@@ -7,7 +7,7 @@ router = "path"
 
 [[services]]
 name = "web"
-paths = [ "/chop-plan/" ]
+paths = [ "/" ]
 localPort = 23875
 
 [services.development]
@@ -24,4 +24,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "23875"
-BASE_PATH = "/chop-plan/"
+BASE_PATH = "/"
