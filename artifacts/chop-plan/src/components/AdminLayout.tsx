@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Store, Users, UserPlus, Receipt, Landmark, Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -22,6 +22,16 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
       setLocation("/vendors");
     }
   }, [isAuthenticated, role, setLocation]);
+
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+
+  // Scroll active nav item into center of the mobile bar on every route change.
+  useEffect(() => {
+    const container = mobileNavRef.current;
+    if (!container) return;
+    const active = container.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [location]);
 
   if (!isAuthenticated || role !== "admin") {
     return null;
@@ -69,7 +79,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         </nav>
       </aside>
 
-      <div className="md:hidden bg-sidebar w-full overflow-x-auto border-b border-sidebar-border hide-scrollbar flex p-2 shrink-0">
+      <div ref={mobileNavRef} className="md:hidden bg-sidebar w-full overflow-x-auto border-b border-sidebar-border hide-scrollbar flex p-2 shrink-0">
         {links.map(link => {
           const active = location === link.href;
           const Icon = link.icon;
@@ -77,6 +87,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
             <Link
               key={link.href}
               href={link.href}
+              data-active={String(active)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap text-sm ${
                 active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FallbackImage } from "@/components/FallbackImage";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -177,7 +177,19 @@ export default function UserDashboardPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="subscriptions" className="w-full">
+      <Tabs
+        defaultValue="subscriptions"
+        className="w-full"
+        onValueChange={() => {
+          // After React has painted the new active trigger, scroll it into centre.
+          requestAnimationFrame(() => {
+            const list = document.querySelector<HTMLElement>('[role="tablist"]');
+            if (!list) return;
+            const active = list.querySelector<HTMLElement>('[data-state="active"]');
+            active?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+          });
+        }}
+      >
         <div className="mb-8 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="font-mono border-b rounded-none bg-transparent h-12 w-max sm:w-full justify-start gap-6 sm:gap-8">
             <TabsTrigger value="subscriptions" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap">
