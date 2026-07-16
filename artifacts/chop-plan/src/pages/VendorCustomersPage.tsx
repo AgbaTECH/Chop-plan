@@ -97,7 +97,7 @@ function VendorAlacarteOrdersTab() {
   }
 
   if (!orders || orders.length === 0) {
-    return <p className="text-center text-muted-foreground py-16">No à la carte orders yet.</p>;
+    return <p className="text-center text-muted-foreground py-16">No single orders yet.</p>;
   }
 
   // Group orders by their order date so the list reads as a clear daily log
@@ -210,7 +210,7 @@ export default function VendorCustomersPage() {
       <Tabs defaultValue="subscriptions" className="w-full">
         <TabsList className="mb-6 font-mono">
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-          <TabsTrigger value="alacarte" data-testid="tab-vendor-alacarte-orders">Off-Schedule Orders</TabsTrigger>
+          <TabsTrigger value="alacarte" data-testid="tab-vendor-alacarte-orders">Single Orders</TabsTrigger>
         </TabsList>
         <TabsContent value="subscriptions">
       <Card className="border-border">

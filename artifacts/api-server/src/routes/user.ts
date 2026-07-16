@@ -11,7 +11,7 @@ import {
   paymentsTable,
   orderNotificationsTable,
 } from "@workspace/db";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
 import { totalScheduleDays } from "../lib/schedule";
 import { toCustomerDisplayPriceNaira, computeOffSchedulePricing } from "../lib/pricing";
@@ -289,7 +289,14 @@ router.get("/user/alacarte/orders", requireAuth("user"), async (req: AuthRequest
     .from(paymentsTable)
     .innerJoin(vendorsTable, eq(paymentsTable.vendorId, vendorsTable.id))
     .leftJoin(mealsTable, eq(paymentsTable.mealId, mealsTable.id))
-    .where(and(eq(paymentsTable.userId, req.session!.id), eq(paymentsTable.orderType, "alacarte")))
+    .where(and(
+      eq(paymentsTable.userId, req.session!.id),
+      eq(paymentsTable.orderType, "alacarte"),
+      // Task #4: only show successful payments (not pending/failed)
+      eq(paymentsTable.status, "success"),
+      // Task #2: only show orders from the current ISO week (Mon 00:00 UTC onwards)
+      sql`${paymentsTable.createdAt} >= date_trunc('week', NOW())`
+    ))
     .orderBy(desc(paymentsTable.createdAt));
 
   res.json(
@@ -378,7 +385,11 @@ router.get("/user/subscriptions/:subscriptionId/schedule", requireAuth("user"), 
     })
     .from(subscriptionDaysTable)
     .leftJoin(mealsTable, eq(subscriptionDaysTable.mealId, mealsTable.id))
-    .where(eq(subscriptionDaysTable.subscriptionId, subscriptionId))
+    .where(and(
+      eq(subscriptionDaysTable.subscriptionId, subscriptionId),
+      // Task #2: only show schedule days from the current ISO week onwards
+      sql`${subscriptionDaysTable.scheduledDate} >= date_trunc('week', NOW())::date`
+    ))
     .orderBy(asc(subscriptionDaysTable.dayNumber));
 
   res.json(days.map((d) => ({

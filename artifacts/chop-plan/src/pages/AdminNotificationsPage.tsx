@@ -15,7 +15,7 @@ const presetLabel: Record<string, string> = {
 
 const orderTypeLabel: Record<string, string> = {
   subscription: "Subscription",
-  alacarte: "Off-schedule",
+  alacarte: "Single",
 };
 
 export default function AdminNotificationsPage() {

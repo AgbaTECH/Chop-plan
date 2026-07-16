@@ -110,10 +110,15 @@ export default function VendorMealsPage() {
       toast({ title: "Add a photo of this meal", variant: "destructive" });
       return;
     }
+    const priceNum = Number(form.priceNaira) || 0;
+    if (priceNum < 200) {
+      toast({ title: "Minimum price is ₦200", variant: "destructive" });
+      return;
+    }
     const payload = {
       name: form.name,
       description: form.description,
-      priceNaira: Number(form.priceNaira) || 0,
+      priceNaira: priceNum,
       imageUrl: form.imageUrl,
       category: form.category || undefined,
       available: form.available,
@@ -175,7 +180,10 @@ export default function VendorMealsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="meal-price">Price (₦)</Label>
-                  <Input id="meal-price" type="number" value={form.priceNaira} onChange={(e) => setForm({ ...form, priceNaira: e.target.value })} data-testid="input-meal-price" />
+                  <Input id="meal-price" type="number" min={200} value={form.priceNaira} onChange={(e) => setForm({ ...form, priceNaira: e.target.value })} data-testid="input-meal-price" />
+                  {Number(form.priceNaira) > 0 && Number(form.priceNaira) < 200 && (
+                    <p className="text-xs text-destructive">Minimum price is ₦200</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="meal-category">Category</Label>
@@ -331,6 +339,10 @@ function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: M
   const handleSave = () => {
     if (!mealId) {
       toast({ title: "Choose the meal Basic customers will get", variant: "destructive" });
+      return;
+    }
+    if ((Number(priceNaira) || 0) < 200) {
+      toast({ title: "Minimum plan price is ₦200", variant: "destructive" });
       return;
     }
     upsertBasic.mutate(

@@ -35,6 +35,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
     { href: "/admin/withdrawals", label: "Withdrawals", icon: Landmark },
     { href: "/admin/notifications", label: "Notifications", icon: Bell },
     { href: "/admin/leads", label: "Leads", icon: UserPlus },
+    { href: "/admin/order-archive", label: "Order Archive", icon: Receipt },
   ];
 
   return (

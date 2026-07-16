@@ -844,7 +844,7 @@ export const ListMyPlansResponse = zod.object({
  * @summary Create or update the vendor's Basic plan
  */
 export const UpsertBasicPlanBody = zod.object({
-  "priceNaira": zod.number(),
+  "priceNaira": zod.number().min(200),
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
   "mealId": zod.number(),
@@ -872,7 +872,7 @@ export const upsertPremiumPlanBodyFreeDayDayOfWeekMax = 6;
 
 
 export const UpsertPremiumPlanBody = zod.object({
-  "priceNaira": zod.number(),
+  "priceNaira": zod.number().min(200),
   "rotation": zod.array(zod.object({
   "dayOfWeek": zod.number().min(upsertPremiumPlanBodyRotationItemDayOfWeekMin).max(upsertPremiumPlanBodyRotationItemDayOfWeekMax),
   "mealId": zod.number()
@@ -942,7 +942,7 @@ export const ListMyMealsResponse = zod.array(ListMyMealsResponseItem)
 export const CreateMealBody = zod.object({
   "name": zod.string(),
   "description": zod.string(),
-  "priceNaira": zod.number(),
+  "priceNaira": zod.number().min(200),
   "imageUrl": zod.string(),
   "category": zod.string().optional(),
   "available": zod.boolean().optional()
@@ -969,7 +969,7 @@ export const UpdateMealParams = zod.object({
 export const UpdateMealBody = zod.object({
   "name": zod.string().optional(),
   "description": zod.string().optional(),
-  "priceNaira": zod.number().optional(),
+  "priceNaira": zod.number().min(200).optional(),
   "imageUrl": zod.string().optional(),
   "category": zod.string().optional(),
   "available": zod.boolean().optional()

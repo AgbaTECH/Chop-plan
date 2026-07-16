@@ -9,6 +9,7 @@ import contactRouter from "./contact";
 import leadsRouter from "./leads";
 import adminRouter from "./admin";
 import storageRouter from "./storage";
+import messagesRouter from "./messages";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(contactRouter);
 router.use(leadsRouter);
 router.use(adminRouter);
 router.use(storageRouter);
+router.use(messagesRouter);
 
 export default router;

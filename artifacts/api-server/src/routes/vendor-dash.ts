@@ -561,7 +561,11 @@ router.get("/vendor/customers/:subscriptionId/schedule", requireAuth("vendor"), 
     })
     .from(subscriptionDaysTable)
     .leftJoin(mealsTable, eq(subscriptionDaysTable.mealId, mealsTable.id))
-    .where(eq(subscriptionDaysTable.subscriptionId, subscriptionId))
+    .where(and(
+      eq(subscriptionDaysTable.subscriptionId, subscriptionId),
+      // Task #2: only show schedule days from the current ISO week onwards
+      sql`${subscriptionDaysTable.scheduledDate} >= date_trunc('week', NOW())::date`
+    ))
     .orderBy(asc(subscriptionDaysTable.dayNumber));
 
   res.json(days.map((d) => ({
@@ -597,7 +601,14 @@ router.get("/vendor/alacarte/orders", requireAuth("vendor"), async (req: AuthReq
     .from(paymentsTable)
     .innerJoin(usersTable, eq(paymentsTable.userId, usersTable.id))
     .leftJoin(mealsTable, eq(paymentsTable.mealId, mealsTable.id))
-    .where(and(eq(paymentsTable.vendorId, vendorId), eq(paymentsTable.orderType, "alacarte")))
+    .where(and(
+      eq(paymentsTable.vendorId, vendorId),
+      eq(paymentsTable.orderType, "alacarte"),
+      // Task #4: only show successful payments to vendors
+      eq(paymentsTable.status, "success"),
+      // Task #2: only show orders from the current ISO week
+      sql`${paymentsTable.createdAt} >= date_trunc('week', NOW())`
+    ))
     .orderBy(desc(paymentsTable.createdAt));
 
   res.json(
@@ -667,6 +678,24 @@ router.post("/vendor/notifications", requireAuth("vendor"), async (req: AuthRequ
   const owner = await resolveVendorOrder(vendorId, orderType, subscriptionDayId, paymentId);
   if (!owner) {
     res.status(404).json({ error: "Order not found" });
+    return;
+  }
+
+  // Task #3: one notification per (order, presetType) — prevent repeat sends.
+  const dupCheck = await db
+    .select({ id: orderNotificationsTable.id })
+    .from(orderNotificationsTable)
+    .where(and(
+      eq(orderNotificationsTable.vendorId, vendorId),
+      eq(orderNotificationsTable.orderType, orderType),
+      eq(orderNotificationsTable.presetType, presetType),
+      orderType === "subscription"
+        ? eq(orderNotificationsTable.subscriptionDayId, subscriptionDayId!)
+        : eq(orderNotificationsTable.paymentId, paymentId!),
+    ))
+    .limit(1);
+  if (dupCheck.length > 0) {
+    res.status(409).json({ error: `A "${presetType}" notification has already been sent for this order.` });
     return;
   }
 

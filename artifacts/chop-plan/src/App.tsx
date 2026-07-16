@@ -35,7 +35,11 @@ import AdminLeadsPage from './pages/AdminLeadsPage';
 import AdminTransactionsPage from './pages/AdminTransactionsPage';
 import AdminWithdrawalsPage from './pages/AdminWithdrawalsPage';
 import AdminNotificationsPage from './pages/AdminNotificationsPage';
+import AdminOrderArchivePage from './pages/AdminOrderArchivePage';
 import PromoFlyerPage from './pages/PromoFlyerPage';
+import VendorMessagesPage from './pages/VendorMessagesPage';
+import UserMessagesPage from './pages/UserMessagesPage';
+import { BackGuard } from './components/BackGuard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +125,10 @@ function Router() {
           <Route path="/admin/withdrawals" component={AdminWithdrawalsPage} />
           <Route path="/admin/notifications" component={AdminNotificationsPage} />
           <Route path="/admin/leads" component={AdminLeadsPage} />
+          <Route path="/admin/order-archive" component={AdminOrderArchivePage} />
+
+          <Route path="/vendor/messages" component={VendorMessagesPage} />
+          <Route path="/messages" component={UserMessagesPage} />
 
           <Route path="/get-started" component={PromoFlyerPage} />
 
@@ -138,6 +146,7 @@ function App() {
         <AuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
             <SessionExpiryHandler />
+            <BackGuard />
             <Router />
           </WouterRouter>
         </AuthProvider>

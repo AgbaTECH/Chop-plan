@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Utensils, Star, ArrowLeft, Calendar, Info, Crown, ShoppingBag } from "lucide-react";
+import { MapPin, Utensils, Star, ArrowLeft, Calendar, Info, Crown, ShoppingBag, MessageSquare } from "lucide-react";
 import { FallbackImage } from "@/components/FallbackImage";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState, ReactNode } from "react";
@@ -170,12 +170,19 @@ export default function VendorDetailPage() {
                 )}
               </div>
               <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">{vendor.businessName}</h1>
-              <p className="text-lg text-muted-foreground flex items-center gap-2 mb-6">
+              <p className="text-lg text-muted-foreground flex items-center gap-2 mb-4">
                 <MapPin className="w-5 h-5 text-primary" /> {vendor.area}
               </p>
-              <p className="text-foreground/80 leading-relaxed max-w-3xl">
+              <p className="text-foreground/80 leading-relaxed max-w-3xl mb-6">
                 {vendor.description || "Enjoy delicious daily meals prepared fresh by our expert kitchen staff. Subscribe to our weekly or monthly plans to secure your lunch."}
               </p>
+              {isAuthenticated && role === "user" && (
+                <Button asChild variant="outline" size="sm" className="font-mono gap-2 mb-2">
+                  <Link href={`/messages`}>
+                    <MessageSquare className="w-4 h-4" /> Message Restaurant
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -233,7 +240,7 @@ export default function VendorDetailPage() {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
-                            <DialogTitle className="font-serif text-2xl">Buy Off-Schedule</DialogTitle>
+                            <DialogTitle className="font-serif text-2xl">Buy as Single Order</DialogTitle>
                             <DialogDescription className="text-base mt-2">
                               A one-off purchase of <strong>{meal.name}</strong> from <strong>{vendor.businessName}</strong> — no subscription required.
                             </DialogDescription>
@@ -244,11 +251,11 @@ export default function VendorDetailPage() {
                               <span className="line-through opacity-60">₦{meal.priceNaira.toLocaleString('en-NG')}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">Off-schedule price</span>
+                              <span className="text-muted-foreground">Single order price</span>
                               <span className="font-bold text-primary">₦{meal.offSchedulePriceNaira.toLocaleString('en-NG')}</span>
                             </div>
                             <p className="text-xs text-muted-foreground font-sans pt-1">
-                              À la carte meals cost more than the same meal on a subscription day — subscribing is still the better deal.
+                              Single orders cost more than the same meal on a subscription day — subscribing is still the better deal.
                             </p>
                           </div>
                           {!isAuthenticated && (

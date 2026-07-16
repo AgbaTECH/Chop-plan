@@ -12,6 +12,7 @@ import {
   vendorBankAccountsTable,
   vendorWithdrawalsTable,
   orderNotificationsTable,
+  subscriptionDaysTable,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../lib/auth-middleware";
@@ -421,6 +422,60 @@ router.get("/admin/notifications", requireAuth("admin"), async (_req, res) => {
       createdAt: r.createdAt.toISOString(),
     }))
   );
+});
+
+// GET /admin/order-archive
+// Returns order history (alacarte payments + subscription days) from BEFORE the
+// current ISO week — records that are hidden from customer/vendor views by the
+// weekly filter (#2). Admin-only, no date filter applied.
+router.get("/admin/order-archive", requireAuth("admin"), async (_req, res) => {
+  const alacarteOrders = await db
+    .select({
+      id: paymentsTable.id,
+      orderType: paymentsTable.orderType,
+      amountNaira: paymentsTable.amountNaira,
+      status: paymentsTable.status,
+      createdAt: paymentsTable.createdAt,
+      vendorName: vendorsTable.businessName,
+      customerName: usersTable.name,
+    })
+    .from(paymentsTable)
+    .innerJoin(vendorsTable, eq(paymentsTable.vendorId, vendorsTable.id))
+    .innerJoin(usersTable, eq(paymentsTable.userId, usersTable.id))
+    .where(and(
+      eq(paymentsTable.orderType, "alacarte"),
+      sql`${paymentsTable.createdAt} < date_trunc('week', NOW())`
+    ))
+    .orderBy(desc(paymentsTable.createdAt))
+    .limit(500);
+
+  const subscriptionDays = await db
+    .select({
+      id: subscriptionDaysTable.id,
+      scheduledDate: subscriptionDaysTable.scheduledDate,
+      status: subscriptionDaysTable.status,
+      confirmedAt: subscriptionDaysTable.confirmedAt,
+      customerName: usersTable.name,
+      vendorName: vendorsTable.businessName,
+    })
+    .from(subscriptionDaysTable)
+    .innerJoin(subscriptionsTable, eq(subscriptionDaysTable.subscriptionId, subscriptionsTable.id))
+    .innerJoin(usersTable, eq(subscriptionsTable.userId, usersTable.id))
+    .innerJoin(vendorsTable, eq(subscriptionsTable.vendorId, vendorsTable.id))
+    .where(sql`${subscriptionDaysTable.scheduledDate} < date_trunc('week', NOW())::date`)
+    .orderBy(desc(subscriptionDaysTable.scheduledDate))
+    .limit(500);
+
+  res.json({
+    alacarteOrders: alacarteOrders.map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    subscriptionDays: subscriptionDays.map((r) => ({
+      ...r,
+      confirmedAt: r.confirmedAt?.toISOString() ?? null,
+    })),
+  });
 });
 
 // POST /admin/maintenance/fix-image-paths

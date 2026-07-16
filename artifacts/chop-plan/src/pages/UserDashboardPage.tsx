@@ -184,10 +184,13 @@ export default function UserDashboardPage() {
               My Subscriptions
             </TabsTrigger>
             <TabsTrigger value="alacarte" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap" data-testid="tab-alacarte-orders">
-              À La Carte Orders
+              Single Orders
             </TabsTrigger>
             <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap">
               Profile Settings
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 whitespace-nowrap">
+              Messages
             </TabsTrigger>
           </TabsList>
         </div>
@@ -319,7 +322,7 @@ export default function UserDashboardPage() {
 
         <TabsContent value="alacarte" className="space-y-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-serif font-bold">Off-Schedule Orders</h2>
+            <h2 className="text-2xl font-serif font-bold">Single Orders</h2>
             <Button asChild size="sm" variant="outline" className="font-mono">
               <Link href="/vendors">Find More Food</Link>
             </Button>
@@ -378,13 +381,35 @@ export default function UserDashboardPage() {
           ) : (
             <div className="text-center py-20 bg-card rounded-xl border border-dashed border-border">
               <ShoppingBag className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-              <h3 className="text-2xl font-serif font-bold mb-2">No à la carte orders yet</h3>
-              <p className="text-muted-foreground max-w-sm mx-auto mb-6">Buy directly from any restaurant on a day outside your plan schedule — no subscription needed.</p>
+              <h3 className="text-2xl font-serif font-bold mb-2">No single orders yet</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto mb-6">Buy a meal directly from any restaurant without a subscription — pick it up same day.</p>
               <Button asChild className="font-mono">
                 <Link href="/vendors">Browse Restaurants</Link>
               </Button>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="messages" className="space-y-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-serif font-bold">Messages</h2>
+          </div>
+          <Card className="border-border">
+            <CardContent className="p-10 flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <ShoppingBag className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl font-bold mb-1">Chat with your restaurants</h3>
+                <p className="text-muted-foreground max-w-sm">Send and receive messages directly with any restaurant you order from.</p>
+              </div>
+              <Button asChild className="font-mono gap-2">
+                <Link href="/messages">
+                  Open Messages
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="profile">
