@@ -3,6 +3,7 @@ import { useListBlogPosts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FallbackImage } from "@/components/FallbackImage";
 
 export default function BlogPage() {
   const { data: posts, isLoading } = useListBlogPosts();
@@ -34,17 +35,16 @@ export default function BlogPage() {
           {posts.map((post) => (
             <Link key={post.id} href={`/blog/${post.id}`}>
               <Card className="h-full overflow-hidden border border-border hover-elevate transition-all cursor-pointer flex flex-col group">
-                {post.coverImage && (
-                  <div className="w-full h-48 overflow-hidden">
-                    <img 
-                      src={post.coverImage} 
-                      alt={post.title} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-                )}
+                <div className="w-full h-48 overflow-hidden">
+                  <FallbackImage
+                    src={post.coverImage ?? undefined}
+                    alt={post.title}
+                    fallback="photo"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
                 <CardHeader>
                   <div className="flex justify-between items-center mb-3">
                     <Badge variant="secondary" className="font-mono text-xs">{post.category}</Badge>

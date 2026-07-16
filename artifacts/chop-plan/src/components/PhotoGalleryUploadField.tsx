@@ -40,7 +40,7 @@ export function PhotoGalleryUploadField({ photos, onChange, testIdPrefix }: Phot
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {photos.map((url, i) => (
           <div key={`${url}-${i}`} className="relative aspect-square bg-muted rounded-md overflow-hidden border border-border">
-            <img src={url} alt={`Kitchen photo ${i + 1}`} className="w-full h-full object-cover" data-testid={`img-${testIdPrefix}-${i}`} />
+            <img src={url} alt={`Kitchen photo ${i + 1}`} className="w-full h-full object-cover" data-testid={`img-${testIdPrefix}-${i}`} onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3'; }} />
             <Button
               type="button"
               variant="destructive"

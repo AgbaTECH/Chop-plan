@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ShieldCheck, ShieldOff, Landmark, ImageOff } from "lucide-react";
+import { FallbackImage } from "@/components/FallbackImage";
 
 export default function AdminVendorDetailPage() {
   const params = useParams<{ id: string }>();
@@ -50,11 +51,9 @@ export default function AdminVendorDetailPage() {
                 <p className="text-sm text-muted-foreground italic">No kitchen description on file.</p>
               )}
               <div className="flex flex-wrap gap-3">
-                {vendor.coverImage && (
-                  <img src={vendor.coverImage} alt="Cover" className="w-28 h-28 object-cover rounded-md border border-border" loading="lazy" decoding="async" />
-                )}
+                <FallbackImage src={vendor.coverImage ?? undefined} alt="Cover" fallback="vendor" className="w-28 h-28 object-cover rounded-md border border-border" loading="lazy" decoding="async" />
                 {vendor.kitchenPhotos.map((photo, i) => (
-                  <img key={i} src={photo} alt={`Kitchen photo ${i + 1}`} className="w-28 h-28 object-cover rounded-md border border-border" loading="lazy" decoding="async" />
+                  <FallbackImage key={i} src={photo} alt={`Kitchen photo ${i + 1}`} fallback="photo" className="w-28 h-28 object-cover rounded-md border border-border" loading="lazy" decoding="async" />
                 ))}
                 {!vendor.coverImage && vendor.kitchenPhotos.length === 0 && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground italic">

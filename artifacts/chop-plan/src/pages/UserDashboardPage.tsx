@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { FallbackImage } from "@/components/FallbackImage";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { 
@@ -216,7 +217,7 @@ export default function UserDashboardPage() {
                     <div className="flex flex-col md:flex-row">
                       {sub.vendorCoverImage && (
                         <div className="w-full md:w-48 h-40 md:h-auto bg-muted">
-                          <img src={sub.vendorCoverImage} alt={sub.vendorName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                          <FallbackImage src={sub.vendorCoverImage ?? undefined} alt={sub.vendorName} fallback="vendor" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         </div>
                       )}
                       <div className="p-6 flex-1 flex flex-col justify-between">

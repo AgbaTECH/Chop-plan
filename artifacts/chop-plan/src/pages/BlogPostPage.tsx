@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { FallbackImage } from "@/components/FallbackImage";
 
 export default function BlogPostPage() {
   const params = useParams();
@@ -62,11 +63,9 @@ export default function BlogPostPage() {
         <p className="text-xl text-muted-foreground">{post.excerpt}</p>
       </div>
 
-      {post.coverImage && (
-        <div className="mb-12 rounded-xl overflow-hidden bg-muted">
-          <img src={post.coverImage} alt={post.title} className="w-full h-auto object-cover max-h-[500px]" loading="lazy" decoding="async" />
-        </div>
-      )}
+      <div className="mb-12 rounded-xl overflow-hidden bg-muted">
+        <FallbackImage src={post.coverImage ?? undefined} alt={post.title} fallback="photo" className="w-full h-full object-cover max-h-[500px]" loading="lazy" decoding="async" />
+      </div>
 
       {/* Since we don't have a real markdown parser here, we'll just render the content as paragraphs */}
       <div className="prose prose-lg prose-green max-w-none pb-20 border-b">

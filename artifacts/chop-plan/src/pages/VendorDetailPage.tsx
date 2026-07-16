@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Utensils, Star, ArrowLeft, Calendar, Info, Crown, ShoppingBag } from "lucide-react";
+import { FallbackImage } from "@/components/FallbackImage";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState, ReactNode } from "react";
 
@@ -150,7 +151,7 @@ export default function VendorDetailPage() {
           <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
             {vendor.coverImage ? (
               <div className="w-full md:w-64 h-64 md:h-48 rounded-xl overflow-hidden shrink-0 shadow-md">
-                <img src={vendor.coverImage} alt={vendor.businessName} className="w-full h-full object-cover" loading="eager" decoding="async" />
+                <FallbackImage src={vendor.coverImage ?? undefined} alt={vendor.businessName} fallback="vendor" className="w-full h-full object-cover" loading="eager" decoding="async" />
               </div>
             ) : (
               <div className="w-full md:w-64 h-64 md:h-48 rounded-xl bg-secondary/5 border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0">
@@ -194,7 +195,7 @@ export default function VendorDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {vendor.kitchenPhotos.map((photo, i) => (
                     <div key={`${photo}-${i}`} className="aspect-square rounded-lg overflow-hidden bg-muted border border-border">
-                      <img src={photo} alt={`${vendor.businessName} kitchen photo ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                      <FallbackImage src={photo} alt={`${vendor.businessName} kitchen photo ${i + 1}`} fallback="photo" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     </div>
                   ))}
                 </div>
@@ -210,11 +211,9 @@ export default function VendorDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {vendor.meals.map((meal) => (
                   <Card key={meal.id} className="overflow-hidden border-border shadow-sm flex flex-col">
-                    {meal.imageUrl && (
-                      <div className="w-full h-40 overflow-hidden bg-muted">
-                        <img src={meal.imageUrl} alt={meal.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      </div>
-                    )}
+                    <div className="w-full h-40 overflow-hidden bg-muted">
+                      <FallbackImage src={meal.imageUrl ?? undefined} alt={meal.name} fallback="meal" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                    </div>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-xl font-serif">{meal.name}</CardTitle>
                     </CardHeader>

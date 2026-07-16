@@ -43,7 +43,7 @@ export function PhotoUploadField({ value, onChange, label, testIdPrefix, emptyHi
       <div className={`relative w-full ${aspect === "square" ? "aspect-square max-w-[160px]" : "aspect-video"} bg-muted rounded-md overflow-hidden border border-border flex items-center justify-center`}>
         {value ? (
           <>
-            <img src={value} alt={label} className="w-full h-full object-cover" data-testid={`img-${testIdPrefix}`} />
+            <img src={value} alt={label} className="w-full h-full object-cover" data-testid={`img-${testIdPrefix}`} onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3'; }} />
             <Button
               type="button"
               variant="destructive"

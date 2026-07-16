@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { MapPin, Utensils, Star, Search } from "lucide-react";
+import { FallbackImage } from "@/components/FallbackImage";
 
 export default function VendorsPage() {
   const [search, setSearch] = useState("");
@@ -83,19 +84,14 @@ export default function VendorsPage() {
             <Link key={vendor.id} href={`/vendors/${vendor.id}`} data-testid={`link-vendor-${vendor.id}`}>
               <Card className="h-full overflow-hidden border border-border hover-elevate cursor-pointer bg-card flex flex-col group transition-all">
                 <div className="w-full h-48 bg-muted relative overflow-hidden">
-                  {vendor.coverImage ? (
-                    <img 
-                      src={vendor.coverImage} 
-                      alt={vendor.businessName} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-secondary/5 text-secondary/40">
-                      <Utensils className="w-12 h-12" />
-                    </div>
-                  )}
+                   <FallbackImage
+                    src={vendor.coverImage ?? undefined}
+                    alt={vendor.businessName}
+                    fallback="vendor"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                    decoding="async"
+                  />
                   {vendor.rating && (
                     <div className="absolute top-3 right-3 bg-background/90 backdrop-blur px-2 py-1 rounded text-xs font-bold flex items-center gap-1 shadow-sm">
                       <Star className="w-3 h-3 fill-primary text-primary" />

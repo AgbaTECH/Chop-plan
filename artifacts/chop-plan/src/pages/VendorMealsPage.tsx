@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, UtensilsCrossed, ClipboardList, Crown, Star } from "lucide-react";
 import { PhotoUploadField } from "@/components/PhotoUploadField";
+import { FallbackImage } from "@/components/FallbackImage";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -211,11 +212,9 @@ export default function VendorMealsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {meals.map((meal) => (
             <Card key={meal.id} className="overflow-hidden border-border">
-              {meal.imageUrl && (
-                <div className="w-full h-36 bg-muted overflow-hidden">
-                  <img src={meal.imageUrl} alt={meal.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                </div>
-              )}
+              <div className="w-full h-36 bg-muted overflow-hidden">
+                <FallbackImage src={meal.imageUrl ?? undefined} alt={meal.name} fallback="meal" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+              </div>
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start gap-2">
                   <CardTitle className="text-lg font-serif">{meal.name}</CardTitle>
