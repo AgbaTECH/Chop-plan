@@ -316,6 +316,7 @@ function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: M
   const [daysPerMonth, setDaysPerMonth] = useState(plan ? String(plan.daysPerMonth) : "12");
   const [freeDays, setFreeDays] = useState(plan ? String(plan.freeDays) : "3");
   const [mealId, setMealId] = useState<string>(plan?.mealId ? String(plan.mealId) : "");
+  const [blurb, setBlurb] = useState(plan?.blurb ?? "");
 
   const mealsById = new Map(meals.map((m) => [m.id, m]));
 
@@ -324,6 +325,7 @@ function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: M
     setDaysPerMonth(plan ? String(plan.daysPerMonth) : "12");
     setFreeDays(plan ? String(plan.freeDays) : "3");
     setMealId(plan?.mealId ? String(plan.mealId) : (meals[0] ? String(meals[0].id) : ""));
+    setBlurb(plan?.blurb ?? "");
     setDialogOpen(true);
   };
 
@@ -333,7 +335,7 @@ function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: M
       return;
     }
     upsertBasic.mutate(
-      { data: { priceNaira: Number(priceNaira) || 0, daysPerMonth: Number(daysPerMonth) || 0, freeDays: Number(freeDays) || 0, mealId: Number(mealId) } },
+      { data: { priceNaira: Number(priceNaira) || 0, daysPerMonth: Number(daysPerMonth) || 0, freeDays: Number(freeDays) || 0, mealId: Number(mealId), blurb: blurb.trim() || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Basic plan saved" });
@@ -373,6 +375,7 @@ function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: M
           <div className="text-sm text-muted-foreground space-y-1">
             <p>₦{plan.priceNaira.toLocaleString("en-NG")} · {plan.daysPerMonth} days + {plan.freeDays} free</p>
             <p>Meal: <span className="text-foreground">{mealsById.get(plan.mealId ?? -1)?.name ?? "Unknown"}</span></p>
+            {plan.blurb && <p className="italic text-xs mt-1">"{plan.blurb}"</p>}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">Not set up yet. Offer a simple single-meal plan any customer can subscribe to.</p>
@@ -424,6 +427,17 @@ function BasicPlanCard({ plan, meals }: { plan: VendorBasicPlan | null; meals: M
               </div>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="basic-blurb">Short blurb <span className="text-muted-foreground font-normal">(optional — shown on your public page)</span></Label>
+              <Textarea
+                id="basic-blurb"
+                value={blurb}
+                onChange={(e) => setBlurb(e.target.value)}
+                placeholder="e.g. Hearty home-style meals, ready every weekday"
+                maxLength={300}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Meal served every day</Label>
               {meals.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">Add a meal to your menu first.</p>
@@ -468,6 +482,7 @@ function PremiumPlanCard({ plan, meals }: { plan: VendorPremiumPlan | null; meal
   const [dialogOpen, setDialogOpen] = useState(false);
   const [priceNaira, setPriceNaira] = useState(plan ? String(plan.priceNaira) : "");
   const [slots, setSlots] = useState<DaySlot[]>(() => buildInitialSlots(plan));
+  const [blurb, setBlurb] = useState(plan?.blurb ?? "");
 
   const eligible = meals.length >= 2;
   const mealsById = new Map(meals.map((m) => [m.id, m]));
@@ -475,6 +490,7 @@ function PremiumPlanCard({ plan, meals }: { plan: VendorPremiumPlan | null; meal
   const openEdit = () => {
     setPriceNaira(plan ? String(plan.priceNaira) : "");
     setSlots(buildInitialSlots(plan));
+    setBlurb(plan?.blurb ?? "");
     setDialogOpen(true);
   };
 
@@ -501,7 +517,7 @@ function PremiumPlanCard({ plan, meals }: { plan: VendorPremiumPlan | null; meal
     const freeDay: TimetableDayInput = { dayOfWeek: freeDayIndex, mealId: Number(slots[freeDayIndex].mealId) };
 
     upsertPremium.mutate(
-      { data: { priceNaira: Number(priceNaira) || 0, rotation, freeDay } },
+      { data: { priceNaira: Number(priceNaira) || 0, rotation, freeDay, blurb: blurb.trim() || undefined } },
       {
         onSuccess: () => {
           toast({ title: "Premium plan saved" });
@@ -542,6 +558,7 @@ function PremiumPlanCard({ plan, meals }: { plan: VendorPremiumPlan | null; meal
         ) : plan ? (
           <div className="text-sm text-muted-foreground space-y-1">
             <p>₦{plan.priceNaira.toLocaleString("en-NG")} · {plan.daysPerMonth} days + {plan.freeDays} free / month</p>
+            {plan.blurb && <p className="italic text-xs">"{plan.blurb}"</p>}
             <ul className="space-y-0.5">
               {plan.rotation.map((r) => (
                 <li key={r.dayOfWeek}>{DAY_NAMES[r.dayOfWeek]}: <span className="text-foreground">{mealsById.get(r.mealId)?.name ?? "Unknown"}</span></li>
@@ -614,6 +631,17 @@ function PremiumPlanCard({ plan, meals }: { plan: VendorPremiumPlan | null; meal
                 </div>
               ))}
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="premium-blurb">Short blurb <span className="text-muted-foreground font-normal">(optional — shown on your public page)</span></Label>
+            <Textarea
+              id="premium-blurb"
+              value={blurb}
+              onChange={(e) => setBlurb(e.target.value)}
+              placeholder="e.g. A rotating menu of chef-curated dishes — never the same week twice"
+              maxLength={300}
+              rows={2}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" className="font-mono" onClick={() => setDialogOpen(false)}>Cancel</Button>

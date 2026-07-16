@@ -847,7 +847,8 @@ export const UpsertBasicPlanBody = zod.object({
   "priceNaira": zod.number(),
   "daysPerMonth": zod.number(),
   "freeDays": zod.number(),
-  "mealId": zod.number()
+  "mealId": zod.number(),
+  "blurb": zod.string().max(300).optional()
 })
 
 export const UpsertBasicPlanResponse = zod.object({
@@ -879,7 +880,8 @@ export const UpsertPremiumPlanBody = zod.object({
   "freeDay": zod.object({
   "dayOfWeek": zod.number().min(upsertPremiumPlanBodyFreeDayDayOfWeekMin).max(upsertPremiumPlanBodyFreeDayDayOfWeekMax),
   "mealId": zod.number()
-})
+}),
+  "blurb": zod.string().max(300).optional()
 })
 
 export const upsertPremiumPlanResponseRotationItemDayOfWeekMin = 0;

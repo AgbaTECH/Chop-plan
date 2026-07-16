@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, unique, pgEnum, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { vendorsTable } from "./vendors";
@@ -19,6 +19,9 @@ export const subscriptionPlansTable = pgTable(
     daysPerMonth: integer("days_per_month").notNull(),
     freeDays: integer("free_days").notNull().default(0),
     priceNaira: integer("price_naira").notNull(),
+    // Optional short blurb the vendor can write to sell the tier — shown on
+    // the public vendor detail page above the meal list.
+    blurb: text("blurb"),
   },
   (table) => ({
     vendorTierUnique: unique().on(table.vendorId, table.tier),

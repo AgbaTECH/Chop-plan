@@ -1,10 +1,11 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
-import { AuthProvider } from './lib/auth-context';
+import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { AuthProvider, useAuth } from './lib/auth-context';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
+import { useEffect } from 'react';
 
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
@@ -36,12 +37,51 @@ import AdminWithdrawalsPage from './pages/AdminWithdrawalsPage';
 import AdminNotificationsPage from './pages/AdminNotificationsPage';
 import PromoFlyerPage from './pages/PromoFlyerPage';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Don't automatically retry on 401 — the session is gone and retrying
+      // will just produce more 401s until the user logs in again.
+      retry: (failureCount, error) => {
+        if ((error as any)?.status === 401) return false;
+        return failureCount < 2;
+      },
+    },
+  },
+});
 
 // Configure the API client to use our token
 setAuthTokenGetter(() => {
   return localStorage.getItem('chop_plan_token');
 });
+
+/**
+ * Listens to all React Query cache errors. When any query fails with a 401
+ * (session expired / server restarted and wiped the old in-memory store), it
+ * clears the local auth state and sends the user to the appropriate login page
+ * so they get a clean "please sign in" experience rather than a broken
+ * dashboard.
+ */
+function SessionExpiryHandler() {
+  const { logout, role } = useAuth();
+  const [, setLocation] = useLocation();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    return qc.getQueryCache().subscribe((event) => {
+      if (event?.type === "updated" && event.action?.type === "error") {
+        const err = event.action.error as any;
+        if (err?.status === 401) {
+          logout();
+          const redirect = role === "vendor" ? "/auth/vendor" : role === "admin" ? "/auth/admin" : "/auth/user";
+          setLocation(redirect);
+        }
+      }
+    });
+  }, [qc, logout, role, setLocation]);
+
+  return null;
+}
 
 function Router() {
   return (
@@ -97,6 +137,7 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <SessionExpiryHandler />
             <Router />
           </WouterRouter>
         </AuthProvider>

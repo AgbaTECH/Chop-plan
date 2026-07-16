@@ -80,6 +80,7 @@ async function buildPublicPlans(vendorId: number, mealsById: Map<number, typeof 
         priceNaira: toCustomerDisplayPriceNaira(basicRow.priceNaira),
         daysPerMonth: basicRow.daysPerMonth,
         freeDays: basicRow.freeDays,
+        blurb: basicRow.blurb ?? null,
         meal: toMealSummary(basicRow.basicMealId),
       }
     : null;
@@ -103,6 +104,7 @@ async function buildPublicPlans(vendorId: number, mealsById: Map<number, typeof 
         priceNaira: toCustomerDisplayPriceNaira(premiumRow.priceNaira),
         daysPerMonth: premiumRow.daysPerMonth,
         freeDays: premiumRow.freeDays,
+        blurb: premiumRow.blurb ?? null,
         rotation: timetable
           .filter((t) => !t.isFreeDay)
           .map((t) => ({ dayOfWeek: t.dayOfWeek, meal: toMealSummary(t.mealId) })),

@@ -167,6 +167,8 @@ export interface PublicBasicPlan {
   daysPerMonth: number;
   freeDays: number;
   meal: PlanMenuItem;
+  /** @nullable */
+  blurb?: string | null;
 }
 
 export interface PublicTimetableDay {
@@ -185,6 +187,8 @@ export interface PublicPremiumPlan {
   freeDays: number;
   rotation: PublicTimetableDay[];
   freeDay: PublicTimetableDay;
+  /** @nullable */
+  blurb?: string | null;
 }
 
 export interface PublicVendorPlans {
@@ -227,6 +231,8 @@ export interface VendorBasicPlan {
   freeDays: number;
   /** @nullable */
   mealId: number | null;
+  /** @nullable */
+  blurb?: string | null;
 }
 
 export interface TimetableDayInput {
@@ -245,6 +251,8 @@ export interface VendorPremiumPlan {
   freeDays: number;
   rotation: TimetableDayInput[];
   freeDay: TimetableDayInput;
+  /** @nullable */
+  blurb?: string | null;
 }
 
 export interface VendorPlans {
@@ -257,12 +265,16 @@ export interface UpsertBasicPlanInput {
   daysPerMonth: number;
   freeDays: number;
   mealId: number;
+  /** Optional short blurb shown on the public vendor page */
+  blurb?: string;
 }
 
 export interface UpsertPremiumPlanInput {
   priceNaira: number;
   rotation: TimetableDayInput[];
   freeDay: TimetableDayInput;
+  /** Optional short blurb shown on the public vendor page */
+  blurb?: string;
 }
 
 export interface Meal {

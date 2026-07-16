@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 import { VendorLayout } from "@/components/VendorLayout";
 import {
   useListVendorCustomers,
@@ -22,7 +24,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotifyCustomerButton, NotificationHistory } from "@/components/OrderNotifications";
 import { format, isToday, isYesterday } from "date-fns";
-import { CalendarCheck, CheckCircle2 } from "lucide-react";
+import { CalendarCheck, CheckCircle2, BellRing } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 /** Human-readable date heading used to group orders by day. */
 function dateGroupLabel(dateStr: string): string {
@@ -172,6 +175,20 @@ export default function VendorCustomersPage() {
   const { data: customers, isLoading } = useListVendorCustomers();
   const [selectedSubId, setSelectedSubId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const notifyAll = useMutation({
+    mutationFn: () =>
+      customFetch<{ sent: number; message: string }>("/api/vendor/notify-all-today", {
+        method: "POST",
+      }),
+    onSuccess: (data) => {
+      toast({ title: data.sent > 0 ? `Notified ${data.sent} customer${data.sent !== 1 ? "s" : ""}` : "No orders to notify", description: data.message });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not send notifications", description: err?.data?.error ?? err?.message, variant: "destructive" });
+    },
+  });
 
   const viewSchedule = (subscriptionId: number) => {
     setSelectedSubId(subscriptionId);
@@ -180,6 +197,16 @@ export default function VendorCustomersPage() {
 
   return (
     <VendorLayout title="Customer Subscriptions">
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => notifyAll.mutate()}
+          disabled={notifyAll.isPending}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          <BellRing className="w-4 h-4" />
+          {notifyAll.isPending ? "Notifying…" : "Notify all today's customers"}
+        </button>
+      </div>
       <Tabs defaultValue="subscriptions" className="w-full">
         <TabsList className="mb-6 font-mono">
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>

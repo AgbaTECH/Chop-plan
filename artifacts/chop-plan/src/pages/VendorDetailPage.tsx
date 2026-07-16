@@ -309,6 +309,9 @@ export default function VendorDetailPage() {
                       onConfirm={handleSubscribe}
                     >
                       <div className="space-y-1 border-t border-border pt-3">
+                        {vendor.plans.basic.blurb && (
+                          <p className="text-sm text-muted-foreground italic mb-2">"{vendor.plans.basic.blurb}"</p>
+                        )}
                         <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-1.5">Every pickup day</p>
                         <p className="text-sm">{vendor.plans.basic.meal.name}</p>
                       </div>
@@ -326,6 +329,9 @@ export default function VendorDetailPage() {
                       badge={<Badge className="gap-1"><Crown className="w-3 h-3" /> Premium</Badge>}
                     >
                       <div className="space-y-1 border-t border-border pt-3">
+                        {vendor.plans.premium.blurb && (
+                          <p className="text-sm text-muted-foreground italic mb-2">"{vendor.plans.premium.blurb}"</p>
+                        )}
                         <p className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-1.5">Weekly timetable</p>
                         <ul className="space-y-1">
                           {vendor.plans.premium.rotation.map((r) => (

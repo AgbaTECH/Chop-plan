@@ -1,5 +1,8 @@
 import { randomBytes, createHash, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
+import { db } from "@workspace/db";
+import { sessionsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 
 export interface Session {
   id: number;
@@ -8,31 +11,58 @@ export interface Session {
   email: string;
 }
 
-const sessions = new Map<string, Session>();
+// ---------------------------------------------------------------------------
+// DB-backed session store
+// ---------------------------------------------------------------------------
+// Sessions are persisted to Postgres so they survive server restarts. Replit
+// idles and redeploys shut the Node process down; previously the in-memory
+// Map was wiped on every restart, logging every user out silently on their
+// next request. The DB store is transparent to callers — same interface,
+// all async now.
 
-export function createSession(data: Session): string {
+export async function createSession(data: Session): Promise<string> {
   const token = randomBytes(32).toString("hex");
-  sessions.set(token, data);
+  await db.insert(sessionsTable).values({
+    token,
+    accountId: data.id,
+    role: data.role,
+    name: data.name,
+    email: data.email,
+  });
   return token;
 }
 
-export function getSession(token: string): Session | null {
-  return sessions.get(token) ?? null;
+export async function getSession(token: string): Promise<Session | null> {
+  const [row] = await db
+    .select()
+    .from(sessionsTable)
+    .where(eq(sessionsTable.token, token));
+  if (!row) return null;
+  return {
+    id: row.accountId,
+    role: row.role as Session["role"],
+    name: row.name,
+    email: row.email,
+  };
 }
 
-export function deleteSession(token: string): void {
-  sessions.delete(token);
+export async function deleteSession(token: string): Promise<void> {
+  await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
 }
 
-// Invalidates all active sessions for a given account, e.g. after a
-// password reset so other logged-in devices are signed out.
-export function deleteSessionsForOwner(role: Session["role"], id: number): void {
-  for (const [token, session] of sessions.entries()) {
-    if (session.role === role && session.id === id) {
-      sessions.delete(token);
-    }
-  }
+/** Invalidates all sessions for an account (e.g. after password reset). */
+export async function deleteSessionsForOwner(
+  role: Session["role"],
+  id: number,
+): Promise<void> {
+  await db
+    .delete(sessionsTable)
+    .where(and(eq(sessionsTable.role, role), eq(sessionsTable.accountId, id)));
 }
+
+// ---------------------------------------------------------------------------
+// Password hashing utilities (unchanged)
+// ---------------------------------------------------------------------------
 
 const BCRYPT_ROUNDS = 12;
 

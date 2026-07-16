@@ -270,7 +270,7 @@ router.put("/vendor/plans/basic", requireAuth("vendor"), async (req: AuthRequest
     res.status(400).json({ error: "Validation failed" });
     return;
   }
-  const { priceNaira, daysPerMonth, freeDays, mealId } = parsed.data;
+  const { priceNaira, daysPerMonth, freeDays, mealId, blurb } = parsed.data;
   if (priceNaira <= 0 || daysPerMonth <= 0 || freeDays < 0) {
     res.status(400).json({ error: "priceNaira and daysPerMonth must be positive, and freeDays cannot be negative" });
     return;
@@ -287,13 +287,13 @@ router.put("/vendor/plans/basic", requireAuth("vendor"), async (req: AuthRequest
     .from(subscriptionPlansTable)
     .where(and(eq(subscriptionPlansTable.vendorId, vendorId), eq(subscriptionPlansTable.tier, "basic")));
 
-  const values = { vendorId, tier: "basic" as const, priceNaira, daysPerMonth, freeDays, basicMealId: mealId };
+  const values = { vendorId, tier: "basic" as const, priceNaira, daysPerMonth, freeDays, basicMealId: mealId, blurb: blurb ?? null };
   const [plan] = existing
     ? await db.update(subscriptionPlansTable).set(values).where(eq(subscriptionPlansTable.id, existing.id)).returning()
     : await db.insert(subscriptionPlansTable).values(values).returning();
 
   res.status(existing ? 200 : 201).json({
-    id: plan.id, priceNaira: plan.priceNaira, daysPerMonth: plan.daysPerMonth, freeDays: plan.freeDays, mealId: plan.basicMealId,
+    id: plan.id, priceNaira: plan.priceNaira, daysPerMonth: plan.daysPerMonth, freeDays: plan.freeDays, mealId: plan.basicMealId, blurb: plan.blurb ?? null,
   });
 });
 
@@ -307,7 +307,7 @@ router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthReque
     res.status(400).json({ error: "Validation failed" });
     return;
   }
-  const { priceNaira, rotation, freeDay } = parsed.data;
+  const { priceNaira, rotation, freeDay, blurb } = parsed.data;
 
   if (priceNaira <= 0) {
     res.status(400).json({ error: "priceNaira must be positive" });
@@ -370,6 +370,7 @@ router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthReque
         daysPerMonth: PREMIUM_DAYS_PER_MONTH,
         freeDays: PREMIUM_FREE_DAYS,
         basicMealId: null,
+        blurb: blurb ?? null,
       };
       const [savedPlan] = existing
         ? await tx.update(subscriptionPlansTable).set(values).where(eq(subscriptionPlansTable.id, existing.id)).returning()
@@ -396,6 +397,7 @@ router.put("/vendor/plans/premium", requireAuth("vendor"), async (req: AuthReque
       priceNaira: plan.priceNaira,
       daysPerMonth: plan.daysPerMonth,
       freeDays: plan.freeDays,
+      blurb: plan.blurb ?? null,
       rotation,
       freeDay,
     });
@@ -696,6 +698,75 @@ router.post("/vendor/notifications", requireAuth("vendor"), async (req: AuthRequ
     message: created.message,
     createdAt: created.createdAt,
   });
+});
+
+// POST /vendor/notify-all-today — send a "ready for pickup" notification to
+// every customer with an unconfirmed order scheduled for today. Returns how
+// many new notifications were sent (skips orders already notified today).
+router.post("/vendor/notify-all-today", requireAuth("vendor"), async (req: AuthRequest, res) => {
+  const vendorId = req.session!.id;
+  const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  // Gather all unconfirmed subscription days scheduled for today.
+  const subDays = await db
+    .select({
+      subscriptionDayId: subscriptionDaysTable.id,
+      userId: subscriptionsTable.userId,
+    })
+    .from(subscriptionDaysTable)
+    .innerJoin(subscriptionsTable, eq(subscriptionDaysTable.subscriptionId, subscriptionsTable.id))
+    .where(
+      and(
+        eq(subscriptionsTable.vendorId, vendorId),
+        sql`${subscriptionDaysTable.scheduledDate}::date = ${todayStr}::date`,
+        sql`${subscriptionDaysTable.status} != 'confirmed'`,
+      )
+    );
+
+  // Gather all unconfirmed alacarte orders placed today.
+  const alacarteOrders = await db
+    .select({ paymentId: paymentsTable.id, userId: paymentsTable.userId })
+    .from(paymentsTable)
+    .where(
+      and(
+        eq(paymentsTable.vendorId, vendorId),
+        eq(paymentsTable.status, "success"),
+        sql`${paymentsTable.orderDate}::date = ${todayStr}::date`,
+        sql`(${paymentsTable.pickupStatus} IS NULL OR ${paymentsTable.pickupStatus} != 'confirmed')`,
+      )
+    );
+
+  const message = "Your order is ready! Come by to pick it up today.";
+  const presetType = "ready";
+
+  const toInsert = [
+    ...subDays.map((r) => ({
+      vendorId,
+      userId: r.userId,
+      orderType: "subscription" as const,
+      subscriptionDayId: r.subscriptionDayId,
+      paymentId: null,
+      presetType,
+      message,
+    })),
+    ...alacarteOrders.map((r) => ({
+      vendorId,
+      userId: r.userId,
+      orderType: "alacarte" as const,
+      subscriptionDayId: null,
+      paymentId: r.paymentId,
+      presetType,
+      message,
+    })),
+  ];
+
+  if (toInsert.length === 0) {
+    res.json({ sent: 0, message: "No unconfirmed orders for today." });
+    return;
+  }
+
+  await db.insert(orderNotificationsTable).values(toInsert);
+  res.json({ sent: toInsert.length, message: `Notified ${toInsert.length} customer${toInsert.length !== 1 ? "s" : ""}.` });
 });
 
 // GET /vendor/notifications — notification history for one of the vendor's

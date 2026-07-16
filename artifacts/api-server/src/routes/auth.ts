@@ -55,7 +55,7 @@ async function handleVerify(role: AccountRole, email: string, code: string) {
     return { status: 400 as const, body: { error: verifyErrorMessage(result.reason) } };
   }
   await db.update(table).set({ verified: true }).where(eq(table.id, account.id));
-  const token = createSession({ id: account.id, role, name: displayName(role, account), email: account.email });
+  const token = await createSession({ id: account.id, role, name: displayName(role, account), email: account.email });
   return { status: 200 as const, body: { token, role, id: account.id, name: displayName(role, account), email: account.email } };
 }
 
@@ -121,7 +121,7 @@ async function handleResetPassword(role: AccountRole, email: string, code: strin
     return { status: 400 as const, body: { error: verifyErrorMessage(result.reason) } };
   }
   await db.update(table).set({ passwordHash: await hashPassword(newPassword) }).where(eq(table.id, account.id));
-  deleteSessionsForOwner(role, account.id);
+  await deleteSessionsForOwner(role, account.id);
   return { status: 200 as const, body: { success: true, message: "Password reset successful" } };
 }
 
@@ -181,7 +181,7 @@ router.post("/auth/user/login", loginRateLimit, async (req, res) => {
     res.status(403).json({ error: "Account not verified", requiresVerification: true, email: user.email });
     return;
   }
-  const token = createSession({ id: user.id, role: "user", name: user.name, email: user.email });
+  const token = await createSession({ id: user.id, role: "user", name: user.name, email: user.email });
   res.json({ token, role: "user", id: user.id, name: user.name, email: user.email });
 });
 
@@ -288,7 +288,7 @@ router.post("/auth/vendor/login", loginRateLimit, async (req, res) => {
     res.status(403).json({ error: "Account not verified", requiresVerification: true, email: vendor.email });
     return;
   }
-  const token = createSession({ id: vendor.id, role: "vendor", name: vendor.businessName, email: vendor.email });
+  const token = await createSession({ id: vendor.id, role: "vendor", name: vendor.businessName, email: vendor.email });
   res.json({ token, role: "vendor", id: vendor.id, name: vendor.businessName, email: vendor.email });
 });
 
@@ -356,14 +356,14 @@ router.post("/auth/admin/login", loginRateLimit, async (req, res) => {
   if (check.upgradedHash) {
     await db.update(adminsTable).set({ passwordHash: check.upgradedHash }).where(eq(adminsTable.id, admin.id));
   }
-  const token = createSession({ id: admin.id, role: "admin", name: admin.name, email: admin.email });
+  const token = await createSession({ id: admin.id, role: "admin", name: admin.name, email: admin.email });
   res.json({ token, role: "admin", id: admin.id, name: admin.name, email: admin.email });
 });
 
-router.post("/auth/logout", (req: AuthRequest, res) => {
+router.post("/auth/logout", async (req: AuthRequest, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
-    deleteSession(authHeader.slice(7));
+    await deleteSession(authHeader.slice(7));
   }
   res.json({ success: true, message: "Logged out" });
 });
