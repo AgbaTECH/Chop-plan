@@ -63,6 +63,28 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Split heavy third-party deps into separate cached chunks so the
+        // initial app bundle stays small and repeat visitors pay nothing to
+        // reload unchanged vendor code.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['wouter'],
+          'query': ['@tanstack/react-query'],
+          'charts': ['recharts'],
+          'ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-select',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-tooltip',
+          ],
+          'date': ['date-fns'],
+          'forms': ['react-hook-form', 'zod'],
+        },
+      },
+    },
   },
   server: {
     port,

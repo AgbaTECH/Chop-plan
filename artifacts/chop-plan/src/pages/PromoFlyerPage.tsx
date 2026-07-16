@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarCheck, Wallet, ChefHat, ShieldCheck } from "lucide-react";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/logo.webp";
 
 const leadSchema = z.object({
   name: z.string().min(2, "Please enter your full name"),

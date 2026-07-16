@@ -87,7 +87,9 @@ export default function VendorsPage() {
                     <img 
                       src={vendor.coverImage} 
                       alt={vendor.businessName} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-secondary/5 text-secondary/40">

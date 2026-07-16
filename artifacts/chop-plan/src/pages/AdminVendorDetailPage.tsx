@@ -51,10 +51,10 @@ export default function AdminVendorDetailPage() {
               )}
               <div className="flex flex-wrap gap-3">
                 {vendor.coverImage && (
-                  <img src={vendor.coverImage} alt="Cover" className="w-28 h-28 object-cover rounded-md border border-border" />
+                  <img src={vendor.coverImage} alt="Cover" className="w-28 h-28 object-cover rounded-md border border-border" loading="lazy" decoding="async" />
                 )}
                 {vendor.kitchenPhotos.map((photo, i) => (
-                  <img key={i} src={photo} alt={`Kitchen photo ${i + 1}`} className="w-28 h-28 object-cover rounded-md border border-border" />
+                  <img key={i} src={photo} alt={`Kitchen photo ${i + 1}`} className="w-28 h-28 object-cover rounded-md border border-border" loading="lazy" decoding="async" />
                 ))}
                 {!vendor.coverImage && vendor.kitchenPhotos.length === 0 && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground italic">

@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, User, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useLogout } from "@workspace/api-client-react";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/logo.webp";
 
 export default function Navbar() {
   const [location, setLocation] = useLocation();

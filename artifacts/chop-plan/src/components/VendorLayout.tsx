@@ -48,7 +48,7 @@ export function VendorLayout({ children, title }: VendorLayoutProps) {
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {links.map(link => {
-            const active = location === link.href;
+            const active = location === link.href || location.startsWith(link.href + "/");
             const Icon = link.icon;
             return (
               <Link 
@@ -71,7 +71,7 @@ export function VendorLayout({ children, title }: VendorLayoutProps) {
       {/* Mobile nav (simple horizontal scroll) */}
       <div className="md:hidden bg-sidebar w-full overflow-x-auto border-b border-sidebar-border hide-scrollbar flex p-2 shrink-0">
         {links.map(link => {
-          const active = location === link.href;
+          const active = location === link.href || location.startsWith(link.href + "/");
           const Icon = link.icon;
           return (
             <Link 

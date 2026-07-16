@@ -216,7 +216,7 @@ export default function UserDashboardPage() {
                     <div className="flex flex-col md:flex-row">
                       {sub.vendorCoverImage && (
                         <div className="w-full md:w-48 h-40 md:h-auto bg-muted">
-                          <img src={sub.vendorCoverImage} alt={sub.vendorName} className="w-full h-full object-cover" />
+                          <img src={sub.vendorCoverImage} alt={sub.vendorName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         </div>
                       )}
                       <div className="p-6 flex-1 flex flex-col justify-between">

@@ -21,8 +21,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotifyCustomerButton, NotificationHistory } from "@/components/OrderNotifications";
-import { format } from "date-fns";
-import { CalendarCheck } from "lucide-react";
+import { format, isToday, isYesterday } from "date-fns";
+import { CalendarCheck, CheckCircle2 } from "lucide-react";
+
+/** Human-readable date heading used to group orders by day. */
+function dateGroupLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "MMMM d, yyyy");
+}
 
 function CustomerScheduleDialog({ subscriptionId, open, onOpenChange }: { subscriptionId: number | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { data: days, isLoading } = useGetVendorCustomerSchedule(subscriptionId ?? 0, {
@@ -53,7 +61,14 @@ function CustomerScheduleDialog({ subscriptionId, open, onOpenChange }: { subscr
                       <Badge variant={day.status === 'confirmed' ? 'default' : 'secondary'} className="font-mono uppercase text-[10px]">
                         {day.status}
                       </Badge>
-                      {isActiveDay && <NotifyCustomerButton orderRef={{ orderType: "subscription", subscriptionDayId: day.id }} />}
+                      {isActiveDay && day.status !== "confirmed" && (
+                      <NotifyCustomerButton orderRef={{ orderType: "subscription", subscriptionDayId: day.id }} />
+                    )}
+                    {day.status === "confirmed" && (
+                      <span className="flex items-center gap-1 text-xs text-emerald-600 font-mono font-medium shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                      </span>
+                    )}
                     </div>
                   </div>
                   {isActiveDay && <NotificationHistory orderRef={{ orderType: "subscription", subscriptionDayId: day.id }} viewer="vendor" />}
@@ -82,37 +97,73 @@ function VendorAlacarteOrdersTab() {
     return <p className="text-center text-muted-foreground py-16">No à la carte orders yet.</p>;
   }
 
+  // Group orders by their order date so the list reads as a clear daily log
+  // rather than a flat chronological dump.
+  const grouped = orders.reduce<Record<string, typeof orders>>((acc, order) => {
+    const key = order.orderDate ?? "unknown";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(order);
+    return acc;
+  }, {});
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
   return (
-    <div className="space-y-4">
-      {orders.map((order) => {
-        const isActiveOrder = order.status === "success";
-        return (
-          <Card key={order.id} className="border-border">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant={order.status === "success" ? "default" : order.status === "failed" ? "destructive" : "secondary"} className="font-mono text-xs uppercase">
-                      {order.status}
-                    </Badge>
-                    {order.pickupStatus === "confirmed" && (
-                      <Badge className="font-mono uppercase text-[10px]">Picked Up</Badge>
+    <div className="space-y-8">
+      {sortedDates.map((dateKey) => (
+        <div key={dateKey}>
+          <h3 className="text-sm font-mono uppercase text-muted-foreground tracking-widest mb-3 border-b border-border pb-2">
+            {dateKey === "unknown" ? "Unknown date" : dateGroupLabel(dateKey)}
+          </h3>
+          <div className="space-y-4">
+            {grouped[dateKey].map((order) => {
+              const isPaid = order.status === "success";
+              const isPickedUp = isPaid && order.pickupStatus === "confirmed";
+              // Only show the Notify button for paid, not-yet-collected orders.
+              // Once the customer marks pickup as confirmed, the notification
+              // thread is resolved — collapse the action and show a done state.
+              const canNotify = isPaid && !isPickedUp;
+              return (
+                <Card key={order.id} className={`border-border ${isPickedUp ? "opacity-75" : ""}`}>
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Badge
+                            variant={order.status === "success" ? "default" : order.status === "failed" ? "destructive" : "secondary"}
+                            className="font-mono text-xs uppercase"
+                          >
+                            {order.status}
+                          </Badge>
+                          {isPickedUp && (
+                            <span className="flex items-center gap-1 text-xs text-emerald-600 font-mono font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Picked up · resolved
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-serif font-bold truncate">
+                          {order.mealName || "Meal"} <span className="text-muted-foreground font-normal text-sm">for</span> {order.userName}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          ₦{order.amountNaira.toLocaleString('en-NG')}
+                        </p>
+                      </div>
+                      {canNotify && (
+                        <div className="shrink-0">
+                          <NotifyCustomerButton orderRef={{ orderType: "alacarte", paymentId: order.id }} />
+                        </div>
+                      )}
+                    </div>
+                    {/* Show notification history for all paid orders — read-only once picked up */}
+                    {isPaid && (
+                      <NotificationHistory orderRef={{ orderType: "alacarte", paymentId: order.id }} viewer="vendor" />
                     )}
-                  </div>
-                  <h3 className="text-lg font-serif font-bold">
-                    {order.mealName || "Meal"} <span className="text-muted-foreground font-normal text-sm">for</span> {order.userName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {order.orderDate ? format(new Date(order.orderDate), 'MMM dd, yyyy') : ""} · ₦{order.amountNaira.toLocaleString('en-NG')}
-                  </p>
-                </div>
-                {isActiveOrder && <NotifyCustomerButton orderRef={{ orderType: "alacarte", paymentId: order.id }} />}
-              </div>
-              {isActiveOrder && <NotificationHistory orderRef={{ orderType: "alacarte", paymentId: order.id }} viewer="vendor" />}
-            </CardContent>
-          </Card>
-        );
-      })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

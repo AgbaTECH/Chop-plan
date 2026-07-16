@@ -213,7 +213,7 @@ export default function VendorMealsPage() {
             <Card key={meal.id} className="overflow-hidden border-border">
               {meal.imageUrl && (
                 <div className="w-full h-36 bg-muted overflow-hidden">
-                  <img src={meal.imageUrl} alt={meal.name} className="w-full h-full object-cover" />
+                  <img src={meal.imageUrl} alt={meal.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 </div>
               )}
               <CardHeader className="pb-2">

@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import compression from "compression";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -14,6 +15,10 @@ const app: Express = express();
 // than trusting an arbitrary chain (which would let a client spoof its own
 // IP by sending a fake header).
 app.set("trust proxy", 1);
+
+// Gzip-compress all API responses. The Paystack webhook handler reads the raw
+// Buffer before this middleware so it doesn't interfere with signature checks.
+app.use(compression());
 
 app.use(
   pinoHttp({

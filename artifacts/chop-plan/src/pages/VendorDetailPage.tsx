@@ -150,7 +150,7 @@ export default function VendorDetailPage() {
           <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
             {vendor.coverImage ? (
               <div className="w-full md:w-64 h-64 md:h-48 rounded-xl overflow-hidden shrink-0 shadow-md">
-                <img src={vendor.coverImage} alt={vendor.businessName} className="w-full h-full object-cover" />
+                <img src={vendor.coverImage} alt={vendor.businessName} className="w-full h-full object-cover" loading="eager" decoding="async" />
               </div>
             ) : (
               <div className="w-full md:w-64 h-64 md:h-48 rounded-xl bg-secondary/5 border border-dashed flex flex-col items-center justify-center text-muted-foreground shrink-0">
@@ -194,7 +194,7 @@ export default function VendorDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {vendor.kitchenPhotos.map((photo, i) => (
                     <div key={`${photo}-${i}`} className="aspect-square rounded-lg overflow-hidden bg-muted border border-border">
-                      <img src={photo} alt={`${vendor.businessName} kitchen photo ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={photo} alt={`${vendor.businessName} kitchen photo ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     </div>
                   ))}
                 </div>
@@ -212,7 +212,7 @@ export default function VendorDetailPage() {
                   <Card key={meal.id} className="overflow-hidden border-border shadow-sm flex flex-col">
                     {meal.imageUrl && (
                       <div className="w-full h-40 overflow-hidden bg-muted">
-                        <img src={meal.imageUrl} alt={meal.name} className="w-full h-full object-cover" />
+                        <img src={meal.imageUrl} alt={meal.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       </div>
                     )}
                     <CardHeader className="pb-3">

@@ -64,7 +64,7 @@ export default function BlogPostPage() {
 
       {post.coverImage && (
         <div className="mb-12 rounded-xl overflow-hidden bg-muted">
-          <img src={post.coverImage} alt={post.title} className="w-full h-auto object-cover max-h-[500px]" />
+          <img src={post.coverImage} alt={post.title} className="w-full h-auto object-cover max-h-[500px]" loading="lazy" decoding="async" />
         </div>
       )}
 

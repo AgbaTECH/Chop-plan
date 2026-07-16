@@ -40,6 +40,8 @@ export default function BlogPage() {
                       src={post.coverImage} 
                       alt={post.title} 
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
                 )}
